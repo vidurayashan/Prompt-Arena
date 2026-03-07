@@ -1,0 +1,651 @@
+# Prompt Arena Configuration
+# --------------------------
+# Set your OpenAI API key in the .env file at the project root (see .env.example).
+# Do NOT paste the key here — this file is committed to git.
+
+# Model used to run the student's prompt against the document
+task_model: "gpt-4o"
+
+# Model used as the LLM judge to score the student's output
+judge_model: "gpt-4o"
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+# Each task needs:
+#   id          - unique slug (no spaces)
+#   name        - display name shown to students
+#   description - short instructions shown on the task page
+#   document    - path to the PDF file (relative to the project root)
+#   items       - list of information pieces students must extract
+#     id        - integer (used in scoring)
+#     label     - what students see (the thing they need to extract)
+#     answer    - correct answer (NEVER shown to students)
+# ---------------------------------------------------------------------------
+tasks:
+  - id: task1
+    name: "Task 1: Patient Medical Report"
+    description: >
+      Below is a patient medical report. Write a prompt that instructs the AI
+      to extract the required information from this document as accurately as possible.
+    document: "documents/sample_medical_report.pdf"
+    items:
+      - id: 1
+        label: "Patient full name"
+        answer: "Emily Carter"
+      - id: 2
+        label: "Date of birth"
+        answer: "14 March 1987"
+      - id: 3
+        label: "Primary diagnosis"
+        answer: "Type 2 Diabetes Mellitus"
+      - id: 4
+        label: "Attending physician"
+        answer: "Dr. James Harrington"
+      - id: 5
+        label: "Prescribed medication"
+        answer: "Metformin 500 mg twice daily"
+
+  - id: task2
+    name: "Task 2: Research Paper Abstract"
+    description: >
+      You have been given a research paper abstract. Write a prompt to make the
+      AI extract the key information listed below from the abstract.
+    document: "documents/sample_abstract.pdf"
+    items:
+      - id: 1
+        label: "Paper title"
+        answer: "Deep Learning for Natural Language Processing: A Survey"
+      - id: 2
+        label: "First author's name"
+        answer: "Sarah Mitchell"
+      - id: 3
+        label: "Year of publication"
+        answer: "2023"
+      - id: 4
+        label: "Main research objective"
+        answer: "To survey deep learning techniques applied to NLP tasks"
+      - id: 5
+        label: "Key finding or conclusion"
+        answer: "Transformer-based models consistently outperform classical approaches across all NLP benchmarks"
+
+  - id: task_insurance_contract
+    name: "Task: Vantara Insurance Policy Information Extraction"
+    description: >
+      Write a prompt to extract the required information from this insurance policy document.
+    document: "documents/VantaraInsurancePolicy_VLG2024HCP00847.pdf"
+    items:
+
+    # IDENTIFICATION & POLICY DETAILS
+    - id: 1
+      label: "Policy Number"
+      answer: "VLG-2024-HCP-00847-AU"
+
+    - id: 2
+      label: "Policy Type"
+      answer: "Combined Health & Residential Property Insurance"
+
+    - id: 3
+      label: "Issue Date"
+      answer: "1 March 2024"
+
+    - id: 4
+      label: "Effective Date"
+      answer: "15 March 2024 (12:01 AM AEDT)"
+
+    - id: 5
+      label: "Expiry Date"
+      answer: "14 March 2025 (11:59 PM AEDT)"
+
+    - id: 6
+      label: "Policy Term"
+      answer: "12 months"
+
+    - id: 7
+      label: "Certificate No."
+      answer: "CERT-VLG-2024-08471"
+
+    - id: 8
+      label: "Regulatory Body"
+      answer: "Australian Prudential Regulation Authority (APRA)"
+
+    - id: 9
+      label: "AFS Licence Number"
+      answer: "293817 (issued by ASIC)"
+
+    - id: 10
+      label: "Product Disclosure Statement version and date"
+      answer: "PDS version 7.2, dated 1 January 2024"
+
+    # PARTIES — INSURER
+    - id: 11
+      label: "Legal Name of Insurer"
+      answer: "Vantara Life & General Insurance PLC"
+
+    - id: 12
+      label: "ABN of Insurer"
+      answer: "47 382 910 553"
+
+    - id: 13
+      label: "ACN of Insurer"
+      answer: "382 910 553"
+
+    - id: 14
+      label: "Registered Office Address of Insurer"
+      answer: "Level 24, 333 Collins Street, Melbourne VIC 3000, Australia"
+
+    - id: 15
+      label: "Phone Number of Insurer"
+      answer: "+61 3 9201 4400"
+
+    - id: 16
+      label: "Email of Insurer"
+      answer: "policyservices@vantarainsurance.com.au"
+
+    - id: 17
+      label: "Entity Type of Insurer"
+      answer: "Public Limited Company incorporated in Victoria, Australia"
+
+    - id: 18
+      label: "Chief Underwriting Officer Name"
+      answer: "Ms. Catherine Merriweather"
+
+    # PARTIES — NAMED INSURED
+    - id: 19
+      label: "Full Legal Name of Named Insured"
+      answer: "Mr. Harrison James Whitfield"
+
+    - id: 20
+      label: "Date of Birth of Named Insured"
+      answer: "14 September 1981 (Age: 42)"
+
+    - id: 21
+      label: "Gender of Named Insured"
+      answer: "Male"
+
+    - id: 22
+      label: "Residential Address of Named Insured"
+      answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
+
+    - id: 23
+      label: "Mobile Phone of Named Insured"
+      answer: "+61 412 774 502"
+
+    - id: 24
+      label: "Email of Named Insured"
+      answer: "h.whitfield@mailcentre.com.au"
+
+    - id: 25
+      label: "Occupation of Named Insured"
+      answer: "Senior Civil Engineer"
+
+    - id: 26
+      label: "Employer of Named Insured"
+      answer: "Aurelius Infrastructure Group Pty Ltd"
+
+    - id: 27
+      label: "Smoker Status of Named Insured"
+      answer: "Non-smoker (declared)"
+
+    # ADDITIONAL INSURED PARTIES
+    - id: 28
+      label: "Additional Insured 1 — Name, Relationship and Date of Birth"
+      answer: "Ms. Priya Kamala Whitfield (Spouse), DOB: 22 April 1984"
+
+    - id: 29
+      label: "Additional Insured 2 — Name, Relationship and Date of Birth"
+      answer: "Master Ethan Lucas Whitfield (Dependent Child), DOB: 3 July 2012"
+
+    - id: 30
+      label: "Additional Insured 3 — Name, Relationship and Date of Birth"
+      answer: "Miss Olivia Rose Whitfield (Dependent Child), DOB: 18 November 2015"
+
+    # BROKER / AGENT
+    - id: 31
+      label: "Broker Company Name and ABN"
+      answer: "Clearview Financial Advisory Pty Ltd, ABN 63 142 887 330"
+
+    - id: 32
+      label: "Broker Contact Person and Title"
+      answer: "Mr. Daniel Forsythe (Senior Insurance Adviser)"
+
+    - id: 33
+      label: "Broker Reference Number"
+      answer: "CVF-BKR-2024-3390"
+
+    - id: 34
+      label: "Broker Remuneration Type"
+      answer: "Commission-based (disclosed in FSG dated 10 January 2024)"
+
+    # FINANCIAL TERMS
+    - id: 35
+      label: "Total Annual Premium (incl. GST)"
+      answer: "AUD $4,218.00"
+
+    - id: 36
+      label: "Base Premium (excl. GST)"
+      answer: "AUD $3,834.00"
+
+    - id: 37
+      label: "GST Component"
+      answer: "AUD $383.40"
+
+    - id: 38
+      label: "Monthly Instalment Amount"
+      answer: "AUD $351.50"
+
+    - id: 39
+      label: "First Payment Date"
+      answer: "15 March 2024"
+
+    - id: 40
+      label: "Payment Method and Bank Details"
+      answer: "Monthly direct debit; BSB 063-000, Account 1234 5678 (Commonwealth Bank)"
+
+    - id: 41
+      label: "Grace Period for Late Payment"
+      answer: "14 calendar days"
+
+    - id: 42
+      label: "Annual Pay Discount Rate"
+      answer: "3% discount if full annual premium paid upfront"
+
+    - id: 43
+      label: "No-Claim Discount after 1 year"
+      answer: "10%"
+
+    - id: 44
+      label: "No-Claim Discount after 2 years"
+      answer: "15%"
+
+    - id: 45
+      label: "No-Claim Discount after 3 or more years"
+      answer: "20%"
+
+    - id: 46
+      label: "Health — Hospital Premium (total incl. GST)"
+      answer: "AUD $1,562.00"
+
+    - id: 47
+      label: "Health — Extras Premium (total incl. GST)"
+      answer: "AUD $748.00"
+
+    - id: 48
+      label: "Property — Building Premium (total incl. GST)"
+      answer: "AUD $961.40"
+
+    - id: 49
+      label: "Property — Contents Premium (total incl. GST)"
+      answer: "AUD $343.20"
+
+    - id: 50
+      label: "Public Liability Premium (total incl. GST)"
+      answer: "AUD $602.80"
+
+    # HEALTH COVERAGE — HOSPITAL
+    - id: 51
+      label: "Type of Health Cover"
+      answer: "Comprehensive Hospital & Extras Health Insurance"
+
+    - id: 52
+      label: "Private Hospital Room — Benefit and Limit"
+      answer: "100% of agreed schedule fee; Unlimited; $250 excess per admission"
+
+    - id: 53
+      label: "Surgical Procedures — Benefit and Limit"
+      answer: "100% of MBS schedule fee; $150,000 limit; $250 excess"
+
+    - id: 54
+      label: "ICU — Benefit, Limit and Excess"
+      answer: "100% of agreed fee; $75,000 limit; Nil excess"
+
+    - id: 55
+      label: "Obstetrics / Maternity — Benefit, Limit and Waiting Period"
+      answer: "100% of MBS schedule fee; $30,000 limit; 12-month waiting period; $250 excess"
+
+    - id: 56
+      label: "Psychiatric / Mental Health — Days per year and Annual Limit"
+      answer: "Up to 35 days/year inpatient; $25,000 annual limit"
+
+    - id: 57
+      label: "Rehabilitation — Days per year and Annual Limit"
+      answer: "Up to 30 days/year; $20,000 annual limit"
+
+    - id: 58
+      label: "Palliative Care — Benefit and Excess"
+      answer: "Covered in full; Unlimited; Nil excess"
+
+    - id: 59
+      label: "Emergency Ambulance — Benefit and Limit"
+      answer: "Covered in full; Unlimited"
+
+    - id: 60
+      label: "Overseas Emergency — Limit and Condition"
+      answer: "$50,000 limit; trips exceeding 90 continuous days excluded"
+
+    - id: 61
+      label: "Standard Excess per Hospital Admission"
+      answer: "$250"
+
+    # HEALTH COVERAGE — EXTRAS
+    - id: 62
+      label: "General Dental — Benefit, Annual Limit and Co-payment"
+      answer: "80% of schedule fee; $1,200 annual limit; $15 co-payment"
+
+    - id: 63
+      label: "Major Dental — Benefit, Annual Limit, Waiting Period and Co-payment"
+      answer: "60% of schedule fee; $2,500 annual limit; 12-month waiting period; $30 co-payment"
+
+    - id: 64
+      label: "Orthodontics — Benefit, Lifetime Limit and Waiting Period"
+      answer: "50% of schedule fee; $3,000 lifetime limit; 12-month waiting period"
+
+    - id: 65
+      label: "Optical — Annual Limit per person"
+      answer: "Up to $300 per person per year"
+
+    - id: 66
+      label: "Physiotherapy — Benefit, Annual Limit and Co-payment"
+      answer: "80% of schedule fee; $900 annual limit; $10 co-payment"
+
+    - id: 67
+      label: "Chiropractic — Benefit, Annual Limit and Co-payment"
+      answer: "80% of schedule fee; $600 annual limit; $10 co-payment"
+
+    - id: 68
+      label: "Psychology / Counselling — Benefit, Annual Limit and Co-payment"
+      answer: "80% of schedule fee; $1,500 annual limit; $10 co-payment"
+
+    - id: 69
+      label: "Podiatry — Benefit and Annual Limit"
+      answer: "80% of schedule fee; $500 annual limit"
+
+    - id: 70
+      label: "Pharmaceuticals (non-PBS) — Benefit and Annual Limit"
+      answer: "60% of cost; $800 annual limit; $20 co-payment"
+
+    - id: 71
+      label: "Hearing Aids — Benefit, Limit, Period and Waiting Period"
+      answer: "50% of cost; $2,000 per 3-year period; 36-month waiting period"
+
+    # WAITING PERIODS
+    - id: 72
+      label: "Waiting Period — Accidents and Emergency"
+      answer: "None"
+
+    - id: 73
+      label: "Waiting Period — General Medical and Surgical"
+      answer: "2 months"
+
+    - id: 74
+      label: "Waiting Period — Obstetrics and Maternity"
+      answer: "12 months"
+
+    - id: 75
+      label: "Waiting Period — Major Dental and Orthodontics"
+      answer: "12 months"
+
+    - id: 76
+      label: "Waiting Period — Pre-existing Conditions (Hospital)"
+      answer: "12 months"
+
+    - id: 77
+      label: "Waiting Period — Psychiatric and Rehabilitation"
+      answer: "2 months (pre-existing conditions: 12 months)"
+
+    - id: 78
+      label: "Waiting Period — Hearing Aids"
+      answer: "36 months"
+
+    - id: 79
+      label: "Waiting Period — All Other Extras"
+      answer: "2 months"
+
+    # PROPERTY — INSURED PREMISES
+    - id: 80
+      label: "Property Address"
+      answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
+
+    - id: 81
+      label: "Property Type and Tenure"
+      answer: "Single-storey residential dwelling on freehold title"
+
+    - id: 82
+      label: "Year Built"
+      answer: "1997"
+
+    - id: 83
+      label: "Construction Materials"
+      answer: "Brick veneer exterior; timber frame; terracotta tile roof"
+
+    - id: 84
+      label: "Land Area"
+      answer: "685 square metres (approx.)"
+
+    - id: 85
+      label: "Local Council"
+      answer: "City of Manningham"
+
+    - id: 86
+      label: "Title Reference"
+      answer: "Volume 9432, Folio 177"
+
+    - id: 87
+      label: "Bushfire Attack Level (BAL)"
+      answer: "BAL-12.5"
+
+    # PROPERTY — BUILDING COVER
+    - id: 88
+      label: "Sum Insured — Building"
+      answer: "AUD $850,000 (agreed value, replacement cost basis)"
+
+    - id: 89
+      label: "Additional Structures — Combined Limit"
+      answer: "$50,000 combined (garage, garden shed, fencing, in-ground swimming pool)"
+
+    - id: 90
+      label: "Debris Removal — Limit as percentage of Sum Insured"
+      answer: "Up to 10% of Building Sum Insured"
+
+    - id: 91
+      label: "Architects and Engineers — Limit as percentage of Sum Insured"
+      answer: "Up to 5% of Building Sum Insured"
+
+    - id: 92
+      label: "Temporary Accommodation — Weekly Rate and Maximum Duration"
+      answer: "AUD $1,500/week for up to 52 weeks while uninhabitable"
+
+    - id: 93
+      label: "Mortgagee Name and Loan Reference Number"
+      answer: "Commonwealth Bank of Australia; Loan No. CBA-MTG-0047883"
+
+    - id: 94
+      label: "Standard Excess — Building"
+      answer: "AUD $500"
+
+    - id: 95
+      label: "Excess for Earthquake and Flood"
+      answer: "AUD $1,000"
+
+    # PROPERTY — CONTENTS COVER
+    - id: 96
+      label: "Sum Insured — Contents"
+      answer: "AUD $120,000"
+
+    - id: 97
+      label: "Basis of Settlement"
+      answer: "Replacement as new"
+
+    - id: 98
+      label: "Single Article Limit (unspecified items)"
+      answer: "AUD $5,000 per unspecified item"
+
+    - id: 99
+      label: "Jewellery and Watches — Combined Limit"
+      answer: "AUD $10,000 combined"
+
+    - id: 100
+      label: "Portable Electronics — Combined Limit"
+      answer: "AUD $8,000 combined"
+
+    - id: 101
+      label: "Cash and Negotiable Instruments — Maximum"
+      answer: "AUD $500"
+
+    - id: 102
+      label: "Standard Excess — Contents"
+      answer: "AUD $250"
+
+    # LIABILITY COVER
+    - id: 103
+      label: "Liability Sum Insured — per occurrence and aggregate"
+      answer: "AUD $20,000,000 per occurrence and in the aggregate"
+
+    - id: 104
+      label: "Legal Defence Costs — how covered"
+      answer: "Covered in addition to the Liability Sum Insured"
+
+    # SCHEDULED HIGH-VALUE ITEMS
+    - id: 105
+      label: "Item B-01 — Description, Value and Certificate Number"
+      answer: "Diamond engagement ring (platinum setting); AUD $18,500; CERT-GIA-2009-447812"
+
+    - id: 106
+      label: "Item B-02 — Description, Value and Serial Number"
+      answer: "Omega Seamaster 300m wristwatch; AUD $8,200; S/N 78341092"
+
+    - id: 107
+      label: "Item B-03 — Description, Value and Serial Number"
+      answer: "Sony Alpha A7 IV camera system (body + 3 lenses); AUD $6,800; S/N 3841759-A"
+
+    - id: 108
+      label: "Item B-04 — Description, Value and Serial Number"
+      answer: "Trek Domane SL6 mountain bicycle (2022); AUD $5,400; S/N WTU2209-00213"
+
+    - id: 109
+      label: "Item B-05 — Description, Value and Provenance Reference"
+      answer: "'Autumn on the Yarra' oil painting by D. Renshaw (2018); AUD $4,500; Provenance ref GVG-4412"
+
+    - id: 110
+      label: "Item B-06 — Description, Value and Serial Number"
+      answer: "Apple MacBook Pro 16-inch M3 Max laptop; AUD $4,200; S/N C02ZQ1NDMD6T"
+
+    # BENEFICIARIES
+    - id: 111
+      label: "Primary Beneficiary — Name, Relationship and Share"
+      answer: "Ms. Priya Kamala Whitfield (Spouse) — 100% of death benefit"
+
+    - id: 112
+      label: "Contingent Beneficiary — Names and Condition"
+      answer: "Master Ethan Lucas Whitfield and Miss Olivia Rose Whitfield (equally), if primary beneficiary predeceases"
+
+    - id: 113
+      label: "Estate Fallback — Condition"
+      answer: "Payable to the Estate of the Named Insured if no surviving named beneficiary"
+
+    # RIDERS & ENDORSEMENTS
+    - id: 114
+      label: "END-C1 — Benefit Type, Amount, Status and Additional Premium"
+      answer: "Accidental Death Benefit; AUD $200,000 lump sum; Active; +AUD $180.00/year"
+
+    - id: 115
+      label: "END-C2 — Benefit Type, Percentage, Waiting Period, Age Limit, Monthly Cap, Status and Additional Premium"
+      answer: "Income Protection; 75% of pre-disability income; 90-day waiting period; to age 65; AUD $12,500 monthly cap; Active; +AUD $420.00/year"
+
+    - id: 116
+      label: "END-C3 — Benefit Type, Maximum Benefit and Status"
+      answer: "Fertility Treatment Benefit; up to AUD $15,000 per couple; Not Selected"
+
+    - id: 117
+      label: "END-C4 — Benefit Type, Coverage Limit, Status and Additional Premium"
+      answer: "Home Office Extension; AUD $10,000 equipment limit; Active; +AUD $95.00/year"
+
+    - id: 118
+      label: "END-C5 — Benefit Type, Coverage Limit, Status and Additional Premium"
+      answer: "Pet Injury Liability; AUD $500,000 per occurrence; Active; +AUD $45.00/year"
+
+    - id: 119
+      label: "END-C6 — Benefit Type, Excess and Status"
+      answer: "Flood Upgrade (full flood cover); AUD $1,000 excess; Not Selected"
+
+    - id: 120
+      label: "END-C7 — Status and Additional Premium"
+      answer: "Scheduled High-Value Items endorsement; Active; +AUD $175.00/year"
+
+    # CLAIMS
+    - id: 121
+      label: "Notification Timeframe — Theft and Burglary"
+      answer: "Within 24 hours of discovery; police report must be obtained within 48 hours"
+
+    - id: 122
+      label: "Notification Timeframe — Property Damage"
+      answer: "Within 7 days of the Insured Event"
+
+    - id: 123
+      label: "Notification Timeframe — Health Claims"
+      answer: "Within 60 days of the date of service or discharge from hospital"
+
+    - id: 124
+      label: "Claims Phone Number"
+      answer: "1800 VANTARA (1800 826 827)"
+
+    - id: 125
+      label: "Claims Email Address"
+      answer: "claims@vantarainsurance.com.au"
+
+    - id: 126
+      label: "Claims Decision Timeframe"
+      answer: "10 Business Days (complex property claims: up to 20 Business Days)"
+
+    - id: 127
+      label: "Settlement Payment Timeframe after Approval"
+      answer: "Within 5 Business Days of claim approval"
+
+    - id: 128
+      label: "Reinstatement Window and Fee"
+      answer: "Within 60 days of lapse date; AUD $55 administration fee"
+
+    - id: 129
+      label: "Cancellation Administration Fee"
+      answer: "AUD $75"
+
+    - id: 130
+      label: "Cooling-off Period Duration and Refund Terms"
+      answer: "21 days from date of issue; full premium refund if no claim has been made"
+
+    # LEGAL & REGULATORY
+    - id: 131
+      label: "Governing Law — State and Country"
+      answer: "State of Victoria, Australia"
+
+    - id: 132
+      label: "Key Legislation Referenced"
+      answer: "Insurance Contracts Act 1984 (Cth); Insurance Act 1973 (Cth); Privacy Act 1988 (Cth); Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
+
+    - id: 133
+      label: "External Dispute Resolution Body — Name and Phone Number"
+      answer: "Australian Financial Complaints Authority (AFCA); 1800 931 678"
+
+    - id: 134
+      label: "EDR Time Limit for Referral"
+      answer: "Within 2 years of the Insurer's final IDR response"
+
+    - id: 135
+      label: "IDR Response Timeframe"
+      answer: "30 calendar days"
+
+    - id: 136
+      label: "Renewal Notice Period"
+      answer: "Minimum 21 days prior to the Expiry Date"
+
+    - id: 137
+      label: "Risk Change Notification Timeframe"
+      answer: "Within 14 Business Days"
+
+    - id: 138
+      label: "Cancellation Notice Period by Insurer"
+      answer: "Minimum 14 days written notice by registered post or email"
+
+    - id: 139
+      label: "Witness to Signature — Name and Date"
+      answer: "Mr. Samuel Okafor; 1 March 2024"
