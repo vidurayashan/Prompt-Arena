@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { SubmitResponse } from "../api";
 
 interface Props {
@@ -11,6 +12,8 @@ function rowClass(score: number): string {
 }
 
 export default function ScoreDisplay({ result }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div>
       {/* Total score header */}
@@ -34,7 +37,16 @@ export default function ScoreDisplay({ result }: Props) {
       </div>
 
       {/* Per-item breakdown */}
-      <h3>Score breakdown</h3>
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none", marginTop: "1rem" }}
+        onClick={() => setCollapsed((c) => !c)}
+      >
+        <h3 style={{ margin: 0 }}>Score breakdown</h3>
+        <span style={{ color: "var(--text-muted)", fontSize: ".85rem" }}>
+          {collapsed ? "▶ show" : "▼ hide"}
+        </span>
+      </div>
+      {!collapsed && (
       <div className="score-items mt-1">
         {result.scores.map((s) => (
           <div key={s.item_id} className={rowClass(s.score)}>
@@ -73,6 +85,7 @@ export default function ScoreDisplay({ result }: Props) {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }

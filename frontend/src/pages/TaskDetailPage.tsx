@@ -44,6 +44,8 @@ export default function TaskDetailPage() {
   const [history, setHistory] = useState<SubmissionAttempt[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [expandedAttempts, setExpandedAttempts] = useState<Set<number>>(new Set());
+  const [itemsCollapsed, setItemsCollapsed] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
   function toggleAttempt(idx: number) {
     setExpandedAttempts((prev) => {
@@ -129,6 +131,16 @@ export default function TaskDetailPage() {
             ← Tasks
           </button>
           <span className="badge">{task.task_model}</span>
+          <span
+            className="badge"
+            style={{
+              background: task.judge_persona === "generous" ? "var(--success-bg, #f0fdf4)" : "var(--bg-subtle, #f1f5f9)",
+              color: task.judge_persona === "generous" ? "var(--success)" : "var(--text-muted)",
+              border: task.judge_persona === "generous" ? "1px solid #bbf7d0" : "1px solid var(--border)",
+            }}
+          >
+            Judge: {task.judge_persona === "generous" ? "Generous" : "Strict"}
+          </span>
         </div>
 
         <h1 style={{ marginBottom: ".5rem" }}>{task.name}</h1>
@@ -153,18 +165,30 @@ export default function TaskDetailPage() {
 
         {/* Items to extract */}
         <div className="card mb-2">
-          <h2>What to extract</h2>
-          <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem" }}>
-            Your prompt must instruct the AI to extract all of the following items from the document.
-          </p>
-          <ul className="items-list">
-            {task.items.map((item) => (
-              <li key={item.id} className="item-row">
-                <span className="item-num">{item.id}</span>
-                <span>{item.label}</span>
-              </li>
-            ))}
-          </ul>
+          <div
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+            onClick={() => setItemsCollapsed((c) => !c)}
+          >
+            <h2 style={{ margin: 0 }}>What to extract</h2>
+            <span style={{ color: "var(--text-muted)", fontSize: ".85rem" }}>
+              {itemsCollapsed ? "▶ show" : "▼ hide"}
+            </span>
+          </div>
+          {!itemsCollapsed && (
+            <>
+              <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", marginTop: ".75rem" }}>
+                Your prompt must instruct the AI to extract all of the following items from the document.
+              </p>
+              <ul className="items-list">
+                {task.items.map((item) => (
+                  <li key={item.id} className="item-row">
+                    <span className="item-num">{item.id}</span>
+                    <span>{item.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
 
         {/* Prompt editor */}
@@ -189,6 +213,8 @@ export default function TaskDetailPage() {
           <div className="flex gap-2 items-center mt-2" style={{ justifyContent: "space-between" }}>
             <span style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
               Model: <strong>{task.task_model}</strong>
+              &nbsp;&nbsp;|&nbsp;&nbsp;
+              Judge: <strong>{task.judge_persona === "generous" ? "Generous" : "Strict"}</strong>
             </span>
             <button
               className="btn btn-primary"
@@ -301,24 +327,49 @@ export default function TaskDetailPage() {
                       )}
                     </div>
                     {isExpanded && attempt.prompt && (
-                      <pre
-                        style={{
-                          margin: 0,
-                          padding: ".75rem 1rem",
-                          background: "var(--bg-subtle, #f8f9fa)",
-                          border: isBest ? "1px solid #bbf7d0" : "1px solid var(--border)",
-                          borderTop: "none",
-                          borderRadius: "0 0 6px 6px",
-                          fontSize: ".82rem",
-                          fontFamily: "monospace",
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                          color: "var(--text)",
-                          overflowX: "auto",
-                        }}
-                      >
-                        {attempt.prompt}
-                      </pre>
+                      <div style={{ position: "relative" }}>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(attempt.prompt);
+                            setCopiedIdx(idx);
+                            setTimeout(() => setCopiedIdx(null), 1500);
+                          }}
+                          style={{
+                            position: "absolute",
+                            top: ".4rem",
+                            right: ".5rem",
+                            background: "var(--bg)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontSize: ".75rem",
+                            padding: "2px 8px",
+                            color: copiedIdx === idx ? "var(--success)" : "var(--text-muted)",
+                            fontWeight: copiedIdx === idx ? 600 : 400,
+                            zIndex: 1,
+                          }}
+                        >
+                          {copiedIdx === idx ? "Copied!" : "Copy"}
+                        </button>
+                        <pre
+                          style={{
+                            margin: 0,
+                            padding: "2rem 1rem .75rem",
+                            background: "var(--bg-subtle, #f8f9fa)",
+                            border: isBest ? "1px solid #bbf7d0" : "1px solid var(--border)",
+                            borderTop: "none",
+                            borderRadius: "0 0 6px 6px",
+                            fontSize: ".82rem",
+                            fontFamily: "monospace",
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            color: "var(--text)",
+                            overflowX: "auto",
+                          }}
+                        >
+                          {attempt.prompt}
+                        </pre>
+                      </div>
                     )}
                   </div>
                 );

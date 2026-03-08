@@ -82,12 +82,15 @@ def _safe_task(task_id: str) -> dict[str, Any]:
 
 def _public_task(task: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
     """Strip answers and add model info before sending to the frontend."""
+    global_persona = cfg.get("judge_persona", "strict")
+    task_persona = task.get("judge_persona", global_persona)
     return {
         "id": task["id"],
         "name": task["name"],
         "description": task["description"],
         "document_filename": Path(task["document"]).name,
         "task_model": cfg["task_model"],
+        "judge_persona": task_persona,
         "items": [
             {"id": item["id"], "label": item["label"]}
             for item in task["items"]
@@ -148,11 +151,26 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     cfg = config_loader.get_config()
     task = _safe_task(task_id)
 
-    api_key = cfg.get("openai_api_key", "")
-    if not api_key:
+    openai_key     = cfg.get("openai_api_key", "")
+    openrouter_key = cfg.get("openrouter_api_key", "")
+
+    task_base_url  = cfg.get("task_provider_base_url", "") or None
+    judge_base_url = cfg.get("judge_provider_base_url", "") or None
+
+    # Pick the right API key: use OpenRouter key when a custom base URL is set,
+    # otherwise fall back to the OpenAI key.
+    task_key  = openrouter_key if task_base_url  else openai_key
+    judge_key = openrouter_key if judge_base_url else openai_key
+
+    if not task_key:
         raise HTTPException(
             status_code=500,
-            detail="OpenAI API key not configured. Set openai_api_key in config.yaml or OPENAI_API_KEY env var.",
+            detail="No API key configured for the task model. Set OPENAI_API_KEY or OPENROUTER_API_KEY in .env.",
+        )
+    if not judge_key:
+        raise HTTPException(
+            status_code=500,
+            detail="No API key configured for the judge model. Set OPENAI_API_KEY or OPENROUTER_API_KEY in .env.",
         )
 
     # 1. Extract PDF text
@@ -165,10 +183,11 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     # 2. Run the student's prompt through the task LLM
     try:
         student_output = llm_client.run_task_prompt(
-            api_key=api_key,
+            api_key=task_key,
             model=cfg["task_model"],
             student_prompt=body.prompt,
             document_text=doc_text,
+            base_url=task_base_url,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Task LLM error: {exc}")
@@ -176,13 +195,17 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     # 3. Judge the output
     items = task["items"]
     correct_answers = [item["answer"] for item in items]
+    global_persona = cfg.get("judge_persona", "strict")
+    task_persona = task.get("judge_persona", global_persona)
     try:
         judgment = llm_client.run_judge(
-            api_key=api_key,
+            api_key=judge_key,
             judge_model=cfg["judge_model"],
             items=items,
             correct_answers=correct_answers,
             student_output=student_output,
+            base_url=judge_base_url,
+            persona=task_persona,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")

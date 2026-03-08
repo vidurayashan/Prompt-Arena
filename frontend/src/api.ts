@@ -14,6 +14,7 @@ export interface TaskItem {
 export interface TaskDetail extends Task {
   document_filename: string;
   task_model: string;
+  judge_persona: string;
   items: TaskItem[];
 }
 

@@ -25,8 +25,8 @@ def _load_raw() -> dict[str, Any]:
 def get_config() -> dict[str, Any]:
     """Return the full parsed config, resolving the API key from env if not set."""
     cfg = _load_raw()
-    api_key = cfg.get("openai_api_key") or os.environ.get("OPENAI_API_KEY", "")
-    cfg["openai_api_key"] = api_key
+    cfg["openai_api_key"] = cfg.get("openai_api_key") or os.environ.get("OPENAI_API_KEY", "")
+    cfg["openrouter_api_key"] = cfg.get("openrouter_api_key") or os.environ.get("OPENROUTER_API_KEY", "")
     return cfg
 
 
