@@ -3,9 +3,12 @@
 from pathlib import Path
 from typing import Any
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import config_loader
@@ -22,6 +25,7 @@ app = FastAPI(title="Prompt Arena API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=r"https://.*\.azurewebsites\.net",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -263,3 +267,12 @@ def get_history(
 ) -> list[dict[str, Any]]:
     _safe_task(task_id)
     return leaderboard.get_student_history(student, task_id)
+
+
+# ---------------------------------------------------------------------------
+# Serve built React frontend (production)
+# ---------------------------------------------------------------------------
+
+_frontend_dist = os.path.join(os.path.dirname(__file__), "../frontend/dist")
+if os.path.isdir(_frontend_dist):
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
