@@ -1,10 +1,11 @@
+import type { ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "./pages/LoginPage";
 import TaskListPage from "./pages/TaskListPage";
 import TaskDetailPage from "./pages/TaskDetailPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
 
-function RequireAuth({ children }: { children: JSX.Element }) {
+function RequireAuth({ children }: { children: ReactElement }) {
   const name = localStorage.getItem("studentName");
   if (!name) return <Navigate to="/" replace />;
   return children;
