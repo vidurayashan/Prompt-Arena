@@ -21,6 +21,8 @@ export interface ScoreItem {
   item_id: number;
   label: string;
   score: number;
+  correct_answer: string;
+  found: string;
   reason: string;
 }
 
@@ -35,8 +37,15 @@ export interface SubmitResponse {
 export interface LeaderboardEntry {
   student_name: string;
   best_score: number;
+  latest_score: number;
   attempts: number;
   last_submitted: string;
+}
+
+export interface SubmissionAttempt {
+  score: number;
+  prompt: string;
+  submitted_at: string;
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -70,4 +79,9 @@ export const api = {
 
   getLeaderboard: (taskId: string) =>
     apiFetch<LeaderboardEntry[]>(`/api/tasks/${taskId}/leaderboard`),
+
+  getHistory: (taskId: string, studentName: string) =>
+    apiFetch<SubmissionAttempt[]>(
+      `/api/tasks/${taskId}/history?student=${encodeURIComponent(studentName)}`
+    ),
 };

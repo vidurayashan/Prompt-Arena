@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -55,6 +55,8 @@ class ScoreItem(BaseModel):
     item_id: int
     label: str
     score: int
+    correct_answer: str
+    found: str
     reason: str
 
 
@@ -185,20 +187,32 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
 
-    total_score: int = int(judgment.get("total", 0))
+    # Compute total server-side from individual scores — never trust the judge's arithmetic
+    raw_scores = judgment.get("scores", [])
+    if raw_scores:
+        total_score: int = round(
+            sum(max(0, min(10, int(s.get("score", 0)))) for s in raw_scores)
+            / (10 * len(raw_scores))
+            * 100
+        )
+    else:
+        total_score = 0
 
     # 4. Persist score
     previous_best = leaderboard.get_student_best(body.student_name, task_id)
-    leaderboard.upsert_score(body.student_name, task_id, total_score)
+    leaderboard.upsert_score(body.student_name, task_id, total_score, body.prompt)
     is_new_best = previous_best is None or total_score > previous_best
 
-    # 5. Build per-item response (merge labels back in)
+    # 5. Build per-item response (merge labels and answers back in)
     label_map = {item["id"]: item["label"] for item in items}
+    answer_map = {item["id"]: item["answer"] for item in items}
     score_items = [
         ScoreItem(
             item_id=s["item_id"],
             label=label_map.get(s["item_id"], f"Item {s['item_id']}"),
             score=s["score"],
+            correct_answer=answer_map.get(s["item_id"], ""),
+            found=s.get("found", ""),
             reason=s["reason"],
         )
         for s in judgment.get("scores", [])
@@ -217,3 +231,12 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
 def get_leaderboard(task_id: str) -> list[dict[str, Any]]:
     _safe_task(task_id)
     return leaderboard.get_leaderboard(task_id)
+
+
+@app.get("/api/tasks/{task_id}/history")
+def get_history(
+    task_id: str,
+    student: str = Query(..., description="Student name"),
+) -> list[dict[str, Any]]:
+    _safe_task(task_id)
+    return leaderboard.get_student_history(student, task_id)

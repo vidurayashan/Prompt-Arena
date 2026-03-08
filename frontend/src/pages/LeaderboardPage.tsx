@@ -17,6 +17,7 @@ function scoreColor(score: number): string {
   return "var(--danger)";
 }
 
+
 export default function LeaderboardPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
@@ -81,7 +82,8 @@ export default function LeaderboardPage() {
                 <tr>
                   <th style={{ width: "60px" }}>Rank</th>
                   <th>Name</th>
-                  <th style={{ width: "110px" }}>Best score</th>
+                  <th style={{ width: "130px" }}>Best score</th>
+                  <th style={{ width: "130px" }}>Latest</th>
                   <th style={{ width: "90px" }}>Attempts</th>
                 </tr>
               </thead>
@@ -89,6 +91,7 @@ export default function LeaderboardPage() {
                 {entries.map((entry, idx) => {
                   const rank = idx + 1;
                   const isMe = entry.student_name === studentName;
+                  const trendUp = entry.latest_score === entry.best_score && entry.attempts > 1;
                   return (
                     <tr
                       key={entry.student_name}
@@ -127,6 +130,29 @@ export default function LeaderboardPage() {
                           {entry.best_score}
                         </span>
                         <span style={{ color: "var(--text-muted)", fontSize: ".8rem" }}>/100</span>
+                        {trendUp && (
+                          <span style={{ color: "var(--success)", fontSize: ".8rem", marginLeft: ".35rem" }}>
+                            ↑
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: scoreColor(entry.latest_score),
+                            fontSize: ".95rem",
+                          }}
+                        >
+                          {entry.latest_score}
+                        </span>
+                        <span style={{ color: "var(--text-muted)", fontSize: ".8rem" }}>/100</span>
+                        {entry.latest_score < entry.best_score && (
+                          <span style={{ color: "var(--danger)", fontSize: ".8rem", marginLeft: ".35rem" }}>↓</span>
+                        )}
+                        {entry.latest_score === entry.best_score && entry.attempts > 1 && (
+                          <span style={{ color: "var(--success)", fontSize: ".8rem", marginLeft: ".35rem" }}>↑</span>
+                        )}
                       </td>
                       <td style={{ color: "var(--text-muted)" }}>{entry.attempts}</td>
                     </tr>

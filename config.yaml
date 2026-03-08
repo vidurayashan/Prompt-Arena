@@ -4,7 +4,7 @@
 # Do NOT paste the key here — this file is committed to git.
 
 # Model used to run the student's prompt against the document
-task_model: "gpt-4o"
+task_model: "gpt-4o-mini"
 
 # Model used as the LLM judge to score the student's output
 judge_model: "gpt-4o"
