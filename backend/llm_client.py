@@ -8,7 +8,7 @@ from openai import OpenAI
 
 
 def _client(api_key: str, base_url: str | None = None) -> OpenAI:
-    kwargs: dict[str, Any] = {"api_key": api_key}
+    kwargs: dict[str, Any] = {"api_key": api_key, "max_retries": 5}
     if base_url:
         kwargs["base_url"] = base_url
     return OpenAI(**kwargs)
