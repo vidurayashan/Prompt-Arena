@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Workshop Activities — La Trobe University</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --red:#C8102E;--red-d:#9B0B22;--red-l:#FBEAED;--red-m:#E8304A;
+  --ink:#1A1A1A;--ink2:#444;--ink3:#777;--ink4:#aaa;
+  --surf:#F7F6F3;--card:#fff;--card2:#FAFAF8;
+  --b1:rgba(0,0,0,0.07);--b2:rgba(0,0,0,0.13);--b3:rgba(0,0,0,0.20);
+  --green:#1E6B38;--green-l:#EAF4EE;--green-b:#C0DDB0;
+  --amber:#7a5c00;--amber-l:#FFF8E1;--amber-b:#F0C040;
+  --blue:#1555A0;--blue-l:#E6F0FB;--blue-b:#B5D4F4;
+  --purple:#4E44B5;--purple-l:#EEEDFE;--purple-b:#CECBF6;
+  --teal:#0D6B53;--teal-l:#E0F4EE;--teal-b:#9FE1CB;
+  --r:14px;--r-sm:8px;--r-lg:20px;
+  --shadow:0 2px 16px rgba(0,0,0,0.09);
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--surf);color:var(--ink);min-height:100vh;line-height:1.65}
+
+/* ── LOGIN ── */
+#login-screen{position:fixed;inset:0;background:var(--ink);display:flex;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+.login-box{background:var(--card);border-radius:var(--r-lg);padding:2.8rem 2.5rem;max-width:420px;width:100%;box-shadow:0 28px 64px rgba(0,0,0,0.5)}
+.login-logo{width:54px;height:54px;background:var(--red);border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:24px;color:white;margin:0 auto 1.4rem}
+.login-box h2{font-family:'DM Serif Display',serif;font-size:24px;font-weight:400;margin-bottom:6px;text-align:center}
+.login-box>p{font-size:13px;color:var(--ink3);margin-bottom:1.8rem;line-height:1.6;text-align:center}
+.lf{margin-bottom:1rem}
+.lf label{font-size:11px;font-weight:500;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}
+.lf input{width:100%;padding:11px 14px;font-size:14px;font-family:'DM Sans',sans-serif;border:1.5px solid var(--b2);border-radius:var(--r-sm);background:var(--surf);color:var(--ink);transition:border-color .15s}
+.lf input:focus{outline:none;border-color:var(--red)}
+.display-chip{display:none;align-items:center;gap:10px;background:var(--green-l);border:1px solid var(--green-b);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:1.2rem}
+.display-chip .dc-av{width:30px;height:30px;border-radius:50%;background:var(--green);color:white;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+.display-chip .dc-info{font-size:13px}
+.display-chip .dc-name{font-weight:600;color:var(--green)}
+.display-chip .dc-hint{font-size:11px;color:var(--teal);margin-top:1px}
+.login-btn{width:100%;padding:13px;background:var(--red);color:white;border:none;border-radius:var(--r-sm);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;transition:background .15s}
+.login-btn:hover{background:var(--red-d)}
+.login-err{font-size:12px;color:var(--red);margin-top:.6rem;min-height:16px;text-align:center}
+
+/* ── NAV ── */
+nav{background:var(--ink);color:white;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:90}
+.nav-brand{display:flex;align-items:center;gap:11px}
+.nav-logo{width:32px;height:32px;background:var(--red);border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:white}
+.nav-title{font-size:13px;font-weight:500}
+.nav-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:1px}
+.nav-right{display:flex;align-items:center;gap:10px}
+.nav-user-chip{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.08);border-radius:20px;padding:4px 12px 4px 5px}
+.nav-av{width:26px;height:26px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:white;flex-shrink:0}
+.nav-uname{font-size:12px;color:rgba(255,255,255,.85)}
+.nav-score{font-size:11px;background:var(--red);color:white;padding:3px 10px;border-radius:20px;font-weight:500}
+.logout-btn{font-size:11px;color:rgba(255,255,255,.45);background:none;border:1px solid rgba(255,255,255,.12);padding:4px 10px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s}
+.logout-btn:hover{color:white;border-color:rgba(255,255,255,.35)}
+
+/* ── API BANNER ── */
+.api-banner{background:var(--amber-l);border-bottom:1px solid var(--amber-b);padding:9px 2rem;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.api-banner label{font-size:12px;font-weight:500;color:var(--amber);white-space:nowrap}
+.api-banner input{flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:12px;border:1px solid var(--amber-b);border-radius:6px;background:white;color:var(--ink);font-family:'DM Sans',sans-serif}
+.api-banner input:focus{outline:none;border-color:var(--red)}
+.api-note{font-size:11px;color:var(--amber);flex:2;min-width:150px;line-height:1.5}
+.api-note a{color:var(--red);text-decoration:none}
+.api-status{font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.api-status.set{background:var(--green-l);color:var(--green)}
+.api-status.unset{background:var(--red-l);color:var(--red)}
+
+/* ── HERO ── */
+.hero{background:var(--ink);color:white;padding:2.5rem 2rem 2rem;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60px;right:-60px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(200,16,46,.2) 0%,transparent 70%);pointer-events:none}
+.hero-inner{max-width:800px;margin:0 auto;position:relative}
+.hero-ey{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--red-m);margin-bottom:.7rem}
+.hero h1{font-family:'DM Serif Display',serif;font-size:clamp(1.7rem,4vw,2.6rem);line-height:1.1;margin-bottom:.7rem;font-weight:400}
+.hero h1 em{color:var(--red-m);font-style:italic}
+.hero-desc{font-size:13px;color:rgba(255,255,255,.58);max-width:500px;line-height:1.7;margin-bottom:1.3rem}
+.hero-pills{display:flex;gap:6px;flex-wrap:wrap}
+.pill{font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+
+/* ── TABS ── */
+.tabs-wrap{background:var(--card);border-bottom:1px solid var(--b1);position:sticky;top:56px;z-index:80}
+.tabs{max-width:800px;margin:0 auto;display:flex;padding:0 2rem;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab-btn{padding:13px 16px;font-size:12px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--ink3);border-bottom:2.5px solid transparent;margin-bottom:-1px;font-family:'DM Sans',sans-serif;transition:color .15s;white-space:nowrap}
+.tab-btn.active{color:var(--red);border-bottom-color:var(--red)}
+.tab-btn:hover:not(.active){color:var(--ink2)}
+
+/* ── MAIN ── */
+main{max-width:800px;margin:0 auto;padding:2rem 2rem 5rem}
+.panel{display:none;animation:fadeUp .2s ease}
+.panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── ACTIVITY CARD ── */
+.act-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:1.5rem 1.6rem;margin-bottom:1.5rem;transition:box-shadow .2s}
+.act-card:hover{box-shadow:var(--shadow)}
+.act-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.act-header-left{display:flex;align-items:center;gap:10px}
+.badge{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;padding:3px 11px;border-radius:20px;white-space:nowrap}
+.b-red{background:var(--red-l);color:var(--red)}.b-blue{background:var(--blue-l);color:var(--blue)}
+.b-teal{background:var(--teal-l);color:var(--teal)}.b-purple{background:var(--purple-l);color:var(--purple)}
+.b-green{background:var(--green-l);color:var(--green)}.b-amber{background:var(--amber-l);color:var(--amber)}
+.pts-chip{font-size:11px;font-weight:600;background:var(--green-l);color:var(--green);padding:3px 10px;border-radius:20px;white-space:nowrap;flex-shrink:0}
+.act-title{font-size:16px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.act-scenario{background:var(--surf);border-left:3px solid var(--red);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:12px 14px;font-size:13px;color:var(--ink2);margin-bottom:14px;line-height:1.65}
+.act-scenario strong{color:var(--ink)}
+.act-tasks{margin-bottom:14px}
+.act-task{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--b1);font-size:13px;color:var(--ink2);line-height:1.55}
+.act-task:last-child{border-bottom:none}
+.task-num{width:20px;height:20px;border-radius:50%;background:var(--red);color:white;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.task-verb{font-weight:600;color:var(--ink);margin-right:3px}
+
+/* ── FORM ── */
+.field-label{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--ink4);margin-bottom:5px;margin-top:12px;display:block}
+select,textarea,input[type=text]{width:100%;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--ink);background:var(--surf);border:1px solid var(--b2);border-radius:var(--r-sm);padding:9px 12px;outline:none;transition:border-color .15s}
+select:focus,textarea:focus,input[type=text]:focus{border-color:var(--red)}
+textarea{resize:vertical;min-height:90px;line-height:1.6}
+.row{display:flex;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap}
+button{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;padding:8px 18px;border-radius:var(--r-sm);cursor:pointer;transition:all .15s;border:1px solid var(--b2);background:var(--card);color:var(--ink);white-space:nowrap}
+button:hover{background:var(--card2)}
+.btn-p{background:var(--red);color:white;border-color:var(--red)}
+.btn-p:hover{background:var(--red-d);border-color:var(--red-d)}
+.btn-p:disabled{background:#ddd;color:#999;border-color:#ddd;cursor:not-allowed}
+
+/* ── RESPONSE ── */
+.resp-box{display:none;margin-top:12px;background:var(--card2);border:1px solid var(--b1);border-radius:var(--r-sm);padding:14px 16px;font-size:13px;line-height:1.75;color:var(--ink);word-break:break-word}
+.resp-box.on{display:block}
+.resp-label{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;color:var(--red);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.resp-text{white-space:pre-wrap}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--red);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+
+/* ── CONVO (interview) ── */
+.convo{margin-top:12px;display:none;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding:2px}
+.convo.on{display:flex}
+.msg{padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.65;max-width:86%}
+.msg-ai{background:var(--teal-l);color:#0a4a3a;align-self:flex-start;border-bottom-left-radius:3px}
+.msg-user{background:var(--red-l);color:#7a1020;align-self:flex-end;border-bottom-right-radius:3px}
+.msg-label{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;opacity:.65}
+.convo-row{display:flex;gap:8px;margin-top:8px}
+.convo-row input{flex:1;padding:9px 12px;font-size:13px;border:1px solid var(--b2);border-radius:var(--r-sm);background:var(--surf);font-family:'DM Sans',sans-serif;color:var(--ink)}
+.convo-row input:focus{outline:none;border-color:var(--red)}
+
+/* ── COMPARE VIEW ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+@media(max-width:560px){.compare-grid{grid-template-columns:1fr}}
+.cmp-box{border:1px solid var(--b2);border-radius:var(--r-sm);padding:12px 14px;background:var(--card2)}
+.cmp-box h4{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;color:var(--ink3)}
+.cmp-box.direct h4{color:var(--blue)}
+.cmp-box.cot h4{color:var(--purple)}
+.cmp-resp{font-size:13px;color:var(--ink2);line-height:1.7;white-space:pre-wrap;min-height:60px}
+.trust-row{margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.trust-btn{font-size:11px;padding:4px 12px;border-radius:20px;border:1px solid var(--b2);background:var(--card);cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif}
+.trust-btn:hover,.trust-btn.sel{background:var(--green-l);border-color:var(--green-b);color:var(--green);font-weight:600}
+
+/* ── PLAYOFF ── */
+.po-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media(max-width:560px){.po-options{grid-template-columns:1fr}}
+.po-opt{background:var(--card2);border:1.5px solid var(--b2);border-radius:var(--r-sm);padding:12px 14px;cursor:pointer;transition:all .2s;position:relative}
+.po-opt:hover{border-color:var(--amber-b);background:var(--amber-l)}
+.po-opt.chosen{border-color:var(--green-b);background:var(--green-l)}
+.po-opt.loser{opacity:.45}
+.po-opt-num{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--ink4);margin-bottom:5px}
+.po-opt-text{font-size:13px;color:var(--ink2);line-height:1.6}
+.po-choose-btn{display:block;margin-top:8px;font-size:11px;font-weight:600;color:var(--green);padding:3px 10px;border-radius:20px;background:var(--green-l);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s}
+.po-choose-btn:hover{background:var(--green-b)}
+.po-stage-label{font-size:12px;font-weight:600;color:var(--ink3);margin:14px 0 4px;display:flex;align-items:center;gap:8px}
+.po-stage-label::after{content:'';flex:1;height:1px;background:var(--b1)}
+.winner-box{background:var(--green-l);border:2px solid var(--green-b);border-radius:var(--r-sm);padding:14px 16px;margin-top:12px}
+.winner-box .wb-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--green);margin-bottom:6px}
+.winner-box .wb-text{font-size:14px;font-weight:500;color:var(--ink);line-height:1.6}
+
+/* ── UPLOAD ── */
+.upload-zone{border:2px dashed var(--b2);border-radius:var(--r-sm);padding:1.4rem;text-align:center;cursor:pointer;transition:all .2s;background:var(--surf);margin-bottom:8px}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--red);background:var(--red-l)}
+.uz-icon{font-size:28px;display:block;margin-bottom:6px}
+.upload-zone p{font-size:13px;color:var(--ink3)}
+.upload-zone input[type=file]{display:none}
+.img-preview{max-width:100%;max-height:200px;border-radius:var(--r-sm);margin-top:8px;display:none}
+.img-preview.on{display:block}
+
+/* ── INNER TABS ── */
+.inner-tabs{display:flex;gap:3px;margin-bottom:12px;background:var(--surf);border-radius:var(--r-sm);padding:3px}
+.inner-tab{flex:1;padding:7px;font-size:12px;font-weight:500;border:none;background:none;cursor:pointer;border-radius:6px;color:var(--ink3);font-family:'DM Sans',sans-serif;transition:.15s;text-align:center}
+.inner-tab.active{background:var(--card);color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+
+/* ── LEADERBOARD ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:1.4rem}
+.stat-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r-sm);padding:.9rem;text-align:center}
+.stat-val{font-size:26px;font-weight:500;color:var(--red)}
+.stat-lbl{font-size:11px;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.lb-wrap{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);overflow:hidden;margin-bottom:1.4rem}
+.lb-head{background:var(--ink);color:white;padding:.9rem 1.4rem;display:flex;align-items:center;justify-content:space-between}
+.lb-head h3{font-family:'DM Serif Display',serif;font-size:18px;font-weight:400}
+.lb-head span{font-size:11px;color:rgba(255,255,255,.4)}
+.lb-row{display:grid;grid-template-columns:44px 1fr 80px 70px;align-items:center;padding:11px 1.4rem;border-bottom:1px solid var(--b1);transition:background .15s;gap:8px}
+.lb-row:last-child{border-bottom:none}
+.lb-row:hover{background:var(--surf)}
+.lb-row.me{background:var(--red-l)}
+.lb-rank{font-size:17px;font-weight:500;color:var(--ink3);text-align:center}
+.lb-rank.r1{color:#B8860B;font-size:20px}.lb-rank.r2{color:#888}.lb-rank.r3{color:#CD7F32}
+.lb-name{font-size:13px;font-weight:500}
+.lb-sub{font-size:11px;color:var(--ink3)}
+.lb-score{font-size:14px;font-weight:600;color:var(--red);text-align:right}
+.lb-acts{font-size:12px;color:var(--ink3);text-align:right}
+.lb-empty{padding:2rem;text-align:center;color:var(--ink3);font-size:13px}
+
+/* ── USERS ── */
+.users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:1.4rem}
+.u-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r-sm);padding:12px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.u-card.online{border-color:var(--green-b)}
+.u-av{width:38px;height:38px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:white}
+.u-name{font-size:12px;font-weight:500}
+.u-status{font-size:11px;color:var(--ink3)}
+.u-dot{width:6px;height:6px;border-radius:50%;background:#ccc;display:inline-block;margin-right:3px}
+.u-dot.on{background:var(--green)}
+
+/* ── TOAST ── */
+.toast{position:fixed;bottom:2rem;right:2rem;background:var(--ink);color:white;padding:11px 18px;border-radius:var(--r-sm);font-size:13px;z-index:999;transform:translateY(100px);opacity:0;transition:all .3s;pointer-events:none;max-width:300px}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── MISC ── */
+.sec-div{font-family:'DM Serif Display',serif;font-size:18px;font-weight:400;color:var(--ink);margin:2rem 0 1rem;padding-bottom:.4rem;border-bottom:1px solid var(--b1)}
+/* ── PROMPT LOG PANEL ── */
+.plog-filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center}
+.plog-filter-row select,.plog-filter-row input[type=text]{width:auto;flex:1;min-width:140px;max-width:240px;font-size:12px;padding:7px 10px}
+.plog-filter-row label{font-size:12px;color:var(--ink3);white-space:nowrap}
+.plog-entry{background:var(--card);border:1px solid var(--b1);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:10px;transition:box-shadow .15s}
+.plog-entry:hover{box-shadow:var(--shadow)}
+.plog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.plog-student{display:flex;align-items:center;gap:8px}
+.plog-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;flex-shrink:0}
+.plog-name{font-size:13px;font-weight:600;color:var(--ink)}
+.plog-id{font-size:11px;color:var(--ink3);margin-top:1px}
+.plog-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plog-act-badge{font-size:10px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.plog-time{font-size:11px;color:var(--ink4);white-space:nowrap}
+.plog-prompt{background:var(--surf);border-left:3px solid var(--b2);border-radius:0 var(--r-sm) var(--r-sm) 0;padding:10px 12px;font-size:13px;color:var(--ink2);line-height:1.65;font-family:'DM Sans',sans-serif;white-space:pre-wrap;word-break:break-word}
+.plog-empty{text-align:center;padding:3rem 1rem;font-size:13px;color:var(--ink3)}
+.plog-count{font-size:13px;color:var(--ink3);margin-bottom:.8rem}
+.plog-count strong{color:var(--ink)}
+
+/* ACT COLOR MAP */
+.plog-a1{background:var(--red)}.plog-a2{background:var(--purple)}.plog-a3{background:var(--teal)}
+.plog-a4{background:var(--amber)}.plog-a5{background:var(--blue)}.plog-a6{background:var(--green)}.plog-a7{background:var(--purple)}
+.badge-a1{background:var(--red-l);color:var(--red)}.badge-a2{background:var(--purple-l);color:var(--purple)}
+.badge-a3{background:var(--teal-l);color:var(--teal)}.badge-a4{background:var(--amber-l);color:var(--amber)}
+.badge-a5{background:var(--blue-l);color:var(--blue)}.badge-a6{background:var(--green-l);color:var(--green)}
+.badge-a7{background:var(--purple-l);color:var(--purple)}
+
+footer{text-align:center;padding:1.4rem;font-size:12px;color:var(--ink4);border-top:1px solid var(--b1);margin-top:2rem}
+
+@media(max-width:600px){
+  .hero{padding:2rem 1.2rem 1.8rem}main{padding:1.2rem 1.2rem 3rem}
+  .tabs{padding:0 .8rem}nav{padding:0 1.2rem}
+  .nav-sub{display:none}.api-banner{padding:8px 1.2rem}
+  .lb-row{grid-template-columns:36px 1fr 70px}.lb-acts{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ════ LOGIN ════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">LT</div>
+    <h2>AI Workshop</h2>
+    <p>La Trobe University · Prompt Engineering & Multimodal AI<br>Enter your details to join the session.</p>
+    <div class="lf">
+      <label>First name</label>
+      <input type="text" id="l-name" placeholder="e.g. Sarah" maxlength="30" oninput="genDisplay()">
+    </div>
+    <div class="lf">
+      <label>Student ID</label>
+      <input type="text" id="l-id" placeholder="e.g. 12345678" maxlength="12" oninput="genDisplay()">
+    </div>
+    <div class="display-chip" id="display-chip">
+      <div class="dc-av" id="dc-av">?</div>
+      <div class="dc-info">
+        <div class="dc-name" id="dc-name">—</div>
+        <div class="dc-hint">Your display name (first name + full student ID)</div>
+      </div>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Join Workshop →</button>
+    <div class="login-err" id="l-err"></div>
+  </div>
+</div>
+
+<!-- ════ NAV ════ -->
+<nav id="main-nav" style="display:none">
+  <div class="nav-brand">
+    <div class="nav-logo">LT</div>
+    <div><div class="nav-title">La Trobe University</div><div class="nav-sub">AI Workshop</div></div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-user-chip">
+      <div class="nav-av" id="nav-av">?</div>
+      <span class="nav-uname" id="nav-uname">Student</span>
+    </div>
+    <span class="nav-score" id="nav-score">0 pts</span>
+    <button class="logout-btn" onclick="doLogout()">Leave</button>
+  </div>
+</nav>
+
+<!-- ════ HERO ════ -->
+<div class="hero" id="main-hero" style="display:none">
+  <div class="hero-inner">
+    <p class="hero-ey">Week 2 · Live Workshop Activities</p>
+    <h1>Prompt Engineering<br>& <em>Multimodal AI</em></h1>
+    <p class="hero-desc">Complete each activity, earn points, and see how you rank on the live class leaderboard. All activities use real AI — powered by Claude.</p>
+    <div class="hero-pills">
+      <span class="pill">Writing tasks</span><span class="pill">Reading tasks</span><span class="pill">Chat applications</span>
+      <span class="pill">CoT prompting</span><span class="pill">Interview pattern</span><span class="pill">Tree-of-thought</span>
+      <span class="pill">Playoff method</span><span class="pill">Multimodal AI</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ TABS ════ -->
+<div class="tabs-wrap" id="main-tabs" style="display:none">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('activities',this)">🛠 All Activities</button>
+    <button class="tab-btn" onclick="switchTab('leaderboard',this)">🏆 Leaderboard</button>
+    <button class="tab-btn" onclick="switchTab('prompts',this)">📋 Student Prompts</button>
+    <button class="tab-btn" onclick="switchTab('users',this)">👥 Live Users</button>
+  </div>
+</div>
+
+<main id="main-content" style="display:none">
+
+<!-- ══════════════════════════════════════
+  ALL ACTIVITIES
+══════════════════════════════════════ -->
+<div id="activities" class="panel active">
+
+<!-- ══ ACTIVITY 1: LLM TASK TYPES ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-red">Activity 1</span>
+      <span style="font-size:12px;color:var(--ink3)">Writing tasks · Reading tasks · Chat applications</span>
+    </div>
+    <span class="pts-chip">+10 pts</span>
+  </div>
+  <div class="act-title">Snack brand launch — try all 3 LLM task types</div>
+  <div class="act-scenario">
+    <strong>Scenario:</strong> You are launching a new snack brand at the university café and want to use AI to help with the launch. Your task is to write one clear, short prompt you would give the AI to help with the launch.
+    <br><br>Consider examples like: <em>Write a funny slogan for my new spicy chips.</em> · <em>Brainstorm 5 creative names for a bubble tea drink.</em> · <em>Create a short Instagram ad to get students to try my energy bar.</em>
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Choose</span> a task type below and select a scenario, or write your own prompt.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Run</span> the AI and review the output.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Reflect:</span> Was it a writing task, reading task, or chat application? Why?</span></div>
+  </div>
+
+  <span class="field-label">Task type</span>
+  <div class="inner-tabs" style="margin-top:6px">
+    <button class="inner-tab active" onclick="switchInnerTab('a1','writing',this)">Writing task</button>
+    <button class="inner-tab" onclick="switchInnerTab('a1','reading',this)">Reading task</button>
+    <button class="inner-tab" onclick="switchInnerTab('a1','chat',this)">Chat application</button>
+  </div>
+
+  <div id="a1-writing">
+    <span class="field-label">Choose a scenario</span>
+    <select onchange="fillP('a1-prompt',this.value)">
+      <option value="">— select or write your own below —</option>
+      <option value="Write a funny slogan for my new spicy chips brand launching at La Trobe café.">Funny slogan for spicy chips</option>
+      <option value="Brainstorm 5 creative names for a bubble tea drink launching at the university café.">5 bubble tea names</option>
+      <option value="Create a short Instagram ad to get university students to try my new energy bar.">Instagram ad for energy bar</option>
+      <option value="Write a one-paragraph marketing email to La Trobe students promoting our new café snack range.">Marketing email to students</option>
+    </select>
+    <span class="field-label">Your prompt</span>
+    <textarea id="a1-prompt" placeholder="Write a short, clear instruction for the AI. Remember: writing task = short input → long output."></textarea>
+    <div class="row">
+      <button class="btn-p" onclick="runAI('a1','writing task',10)">Run ↗</button>
+      <button onclick="clearAct('a1')">Clear</button>
+    </div>
+  </div>
+  <div id="a1-reading" style="display:none">
+    <span class="field-label">Choose a scenario</span>
+    <select onchange="fillP('a1-prompt',this.value)">
+      <option value="">— select or write your own below —</option>
+      <option value="Read this email and classify which department should handle it. Choose from: Sales, Support, Billing, Returns.\n\n'Hi, I ordered a bubble tea but received the wrong flavour. I'd like to exchange it. Order #12345.'">Classify a customer email</option>
+      <option value="Summarise this product description in 2 bullet points for a social media caption:\n'Our new Spicy Mango Chips are made with 100% natural ingredients, hand-sliced and baked (not fried) for a healthier crunch. Available in Original, Extra Spicy, and Sweet Chilli. Perfect for uni students on the go. Buy 2 get 1 free this week only at La Trobe café.'">Summarise product description</option>
+      <option value="Read these 3 student reviews and identify the most common theme:\n1. 'Loved the taste but packaging felt wasteful.'\n2. 'Great flavour! Wish the bag was more eco-friendly.'\n3. 'Delicious chips but why so much plastic?'">Identify theme from reviews</option>
+    </select>
+    <span class="field-label">Your prompt</span>
+    <textarea id="a1-prompt" placeholder="Give the AI lots of information and ask it to extract, summarise or classify. Remember: reading task = long input → short output."></textarea>
+    <div class="row">
+      <button class="btn-p" onclick="runAI('a1','reading task',10)">Run ↗</button>
+      <button onclick="clearAct('a1')">Clear</button>
+    </div>
+  </div>
+  <div id="a1-chat" style="display:none">
+    <span class="field-label">Choose a scenario</span>
+    <select onchange="fillP('a1-prompt',this.value)">
+      <option value="">— select or write your own below —</option>
+      <option value="I am launching a new snack brand at the university café. I need some help. Ask me questions to understand my product and then help me come up with a launch plan.">Snack brand launch consultant</option>
+      <option value="I want to create a social media strategy for my café snack brand. Ask me about my target audience and goals first, then suggest the best platforms and content ideas.">Social media strategy chat</option>
+    </select>
+    <span class="field-label">Start the conversation</span>
+    <textarea id="a1-prompt" placeholder="Tell the AI to ask you questions and guide you through a topic. Remember: chat application = back-and-forth conversation."></textarea>
+    <div class="row">
+      <button class="btn-p" onclick="startChatA1()">Start chat ↗</button>
+      <button onclick="clearChatA1()">Reset</button>
+    </div>
+    <div class="convo" id="a1-convo"></div>
+    <div id="a1-reply-row" style="display:none">
+      <div class="convo-row">
+        <input type="text" id="a1-reply" placeholder="Type your reply…" onkeydown="if(event.key==='Enter')sendChatA1()">
+        <button class="btn-p" onclick="sendChatA1()">Send →</button>
+      </div>
+    </div>
+  </div>
+  <div class="resp-box" id="a1-resp"><div class="resp-label"><span class="dot"></span>AI Response</div><div class="resp-text" id="a1-text"></div></div>
+</div>
+
+<!-- ══ ACTIVITY 2: DIRECT vs STEP-BY-STEP ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-purple">Activity 2</span>
+      <span style="font-size:12px;color:var(--ink3)">Chain-of-thought prompting</span>
+    </div>
+    <span class="pts-chip">+15 pts</span>
+  </div>
+  <div class="act-title">Direct vs step-by-step prompts — which do you trust more?</div>
+  <div class="act-scenario">
+    <strong>Scenario:</strong> A subscription costs $30 per month. For months 1 to 3, there is a 15% discount. There is also a one-time $10 setup fee. After discounts and fees, apply 10% GST. <strong>What is the total cost for the first 3 months?</strong>
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Explore direct prompt:</span> Prompt the AI to give only the final total in dollars. Do not ask for any steps.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Explore step-by-step prompt:</span> Prompt the AI to think step by step, show each calculation, then give the final total in dollars on the last line.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Reflect:</span> Which output did you trust more and why? When might you prefer the other method?</span></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div>
+      <span class="field-label">Direct prompt</span>
+      <textarea id="a2-direct" style="min-height:70px" placeholder="Ask for only the final total — no steps.">A subscription costs $30/month. For months 1–3 there is a 15% discount. There is also a one-time $10 setup fee. After discounts and fees, apply 10% GST. What is the total cost for the first 3 months? Give only the final total in dollars.</textarea>
+      <button class="btn-p" style="margin-top:8px;width:100%" onclick="runCompare('direct')">Run direct ↗</button>
+    </div>
+    <div>
+      <span class="field-label">Step-by-step prompt</span>
+      <textarea id="a2-cot" style="min-height:70px" placeholder="Ask the AI to show every calculation step by step.">A subscription costs $30/month. For months 1–3 there is a 15% discount. There is also a one-time $10 setup fee. After discounts and fees, apply 10% GST. What is the total cost for the first 3 months? Think step by step, show each calculation clearly, then give the final total in dollars on the last line.</textarea>
+      <button class="btn-p" style="margin-top:8px;width:100%;background:var(--purple);border-color:var(--purple)" onclick="runCompare('cot')">Run step-by-step ↗</button>
+    </div>
+  </div>
+
+  <div class="compare-grid" id="a2-compare" style="display:none">
+    <div class="cmp-box direct">
+      <h4>Direct prompt result</h4>
+      <div class="cmp-resp" id="a2-direct-resp">Running…</div>
+      <div class="trust-row">
+        <span style="font-size:12px;color:var(--ink3)">Do you trust this answer?</span>
+        <button class="trust-btn" onclick="markTrust('direct','yes',this)">Yes ✓</button>
+        <button class="trust-btn" onclick="markTrust('direct','no',this)">Not sure ✗</button>
+      </div>
+    </div>
+    <div class="cmp-box cot">
+      <h4>Step-by-step result</h4>
+      <div class="cmp-resp" id="a2-cot-resp">Run the step-by-step prompt first.</div>
+      <div class="trust-row">
+        <span style="font-size:12px;color:var(--ink3)">Do you trust this answer?</span>
+        <button class="trust-btn" onclick="markTrust('cot','yes',this)">Yes ✓</button>
+        <button class="trust-btn" onclick="markTrust('cot','no',this)">Not sure ✗</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="a2-reflection-row" style="display:none;margin-top:14px">
+    <span class="field-label">Your one-line reflection — which did you trust more and why?</span>
+    <textarea id="a2-reflection" style="min-height:50px" placeholder="e.g. I trusted the step-by-step answer more because I could verify each calculation myself."></textarea>
+    <div class="row"><button class="btn-p" onclick="submitA2Reflection()">Submit reflection ↗</button></div>
+    <div class="resp-box" id="a2-fb-resp"><div class="resp-label"><span class="dot"></span>Coach Feedback</div><div class="resp-text" id="a2-fb-text"></div></div>
+  </div>
+</div>
+
+<!-- ══ ACTIVITY 3: INTERVIEW PATTERN / HR JOB DESIGN ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-teal">Activity 3</span>
+      <span style="font-size:12px;color:var(--ink3)">Interview pattern · Chat application</span>
+    </div>
+    <span class="pts-chip">+15 pts</span>
+  </div>
+  <div class="act-title">AI job roles — HR job design using interview pattern</div>
+  <div class="act-scenario">
+    <strong>Prompt to use:</strong> <em>'You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description based on the company's needs, responsibilities and expectations.'</em>
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Paste</span> the prompt into the AI below (it is pre-filled) and start the session.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Answer</span> the AI's follow-up questions as if you were briefing a real HR consultant. The AI may ask about job title, responsibilities, required skills, team culture or benefits.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Review</span> the job description it generates once the AI has enough information.</span></div>
+    <div class="act-task"><span class="task-num">4</span><span><span class="task-verb">Reflect:</span> How effectively did the AI gather your input and tailor the output to match the role?</span></div>
+  </div>
+
+  <span class="field-label">Choose a role type (optional)</span>
+  <select onchange="if(this.value)document.getElementById('a3-prompt').value=this.value">
+    <option value="">— use the default HR prompt or pick a specialisation —</option>
+    <option value="You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description for a technology role based on the company's needs, responsibilities and expectations.">Technology / AI role</option>
+    <option value="You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description for a marketing role based on the company's needs, responsibilities and expectations.">Marketing role</option>
+    <option value="You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description for a sales or customer success role based on the company's needs, responsibilities and expectations.">Sales / Customer success role</option>
+    <option value="You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description for a graduate or entry-level position based on the company's needs, responsibilities and expectations.">Graduate / Entry-level role</option>
+  </select>
+  <span class="field-label">Your prompt</span>
+  <textarea id="a3-prompt" style="min-height:70px">You are an experienced HR consultant. Start a job role design session by asking me detailed questions one at a time. Use my answers to write an accurate and appealing job description based on the company's needs, responsibilities and expectations.</textarea>
+  <div class="row">
+    <button class="btn-p" onclick="startA3()">Start session ↗</button>
+    <button onclick="clearA3()">Reset</button>
+  </div>
+  <div class="convo" id="a3-convo"></div>
+  <div id="a3-reply-row" style="display:none">
+    <div class="convo-row">
+      <input type="text" id="a3-reply" placeholder="Answer the AI's question…" onkeydown="if(event.key==='Enter')sendA3()">
+      <button class="btn-p" onclick="sendA3()">Send →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ACTIVITY 4: PLAYOFF METHOD ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-amber">Activity 4</span>
+      <span style="font-size:12px;color:var(--ink3)">Playoff method · Prompt refinement</span>
+    </div>
+    <span class="pts-chip">+20 pts</span>
+  </div>
+  <div class="act-title">Playoff prompt — eco-friendly delivery service taglines</div>
+  <div class="act-scenario">
+    <strong>Your task:</strong> Write a prompt to generate taglines for an eco-friendly delivery service. Use the playoff method to select the best tagline. Post your winning tagline along with one sentence explaining why you chose it.
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Write</span> a prompt to generate taglines for an eco-friendly delivery service — or use the example below.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Generate</span> 4 tagline options from the AI.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Use the playoff method:</span> Round 1 — pick the better from each pair. Final — pick the overall winner.</span></div>
+    <div class="act-task"><span class="task-num">4</span><span><span class="task-verb">Post</span> your winning tagline and explain in one sentence why you chose it.</span></div>
+  </div>
+
+  <span class="field-label">Your prompt</span>
+  <textarea id="a4-prompt" style="min-height:60px">Generate 4 distinct taglines for an eco-friendly delivery service. Each tagline should highlight sustainability, speed and community impact. Make each one different in tone and style.</textarea>
+  <div class="row">
+    <button class="btn-p" onclick="runPlayoff()">Generate 4 taglines ↗</button>
+    <button onclick="resetPlayoff()">Reset</button>
+  </div>
+
+  <div id="a4-loading" style="display:none;font-size:13px;color:var(--ink3);margin-top:10px">⏳ Generating 4 taglines…</div>
+
+  <div id="a4-stage1" style="display:none;margin-top:16px">
+    <div class="po-stage-label">Round 1 — Pick the better tagline from each pair</div>
+    <div class="po-options" id="a4-opts12"></div>
+    <div class="po-options" id="a4-opts34" style="margin-top:10px"></div>
+  </div>
+
+  <div id="a4-stage2" style="display:none;margin-top:10px">
+    <div class="po-stage-label">Final round — Pick the overall winner</div>
+    <div class="po-options" id="a4-finalists"></div>
+  </div>
+
+  <div id="a4-winner-wrap" style="display:none;margin-top:10px">
+    <div class="winner-box">
+      <div class="wb-label">🏆 Your winning tagline</div>
+      <div class="wb-text" id="a4-winner-text"></div>
+    </div>
+    <span class="field-label">Why did you choose this tagline? (one sentence)</span>
+    <textarea id="a4-reason" style="min-height:50px" placeholder="e.g. It was the most vivid and memorable, and the sustainability message was clearest."></textarea>
+    <div class="row">
+      <button class="btn-p" onclick="submitA4()">Submit ↗</button>
+    </div>
+    <div class="resp-box" id="a4-resp"><div class="resp-label"><span class="dot"></span>Coach Feedback</div><div class="resp-text" id="a4-text"></div></div>
+  </div>
+</div>
+
+<!-- ══ ACTIVITY 5: MULTIMODAL — DOCUMENT ANALYSIS ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-blue">Activity 5</span>
+      <span style="font-size:12px;color:var(--ink3)">Multimodal prompting · Reading task</span>
+    </div>
+    <span class="pts-chip">+20 pts</span>
+  </div>
+  <div class="act-title">Analysing business documents — multimodal AI</div>
+  <div class="act-scenario">
+    <strong>Scenario:</strong> You are part of a research team analysing a business document that includes text, tables and charts. Use a multimodal AI tool to summarise insights from both text and visuals, identify patterns, and answer questions based on the charts and commentary.
+    <br><br><em>Prompt example: 'Summarise the attached document, analysing both the text and the charts. Highlight 5 key takeaways including economic forecasts, major spending areas and policy changes.'</em>
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Upload</span> an image of a business document, chart, table or report — or paste text data below.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Choose</span> what the AI should do with it.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Review</span> the AI's analysis. How well did it handle the combination of text and visuals?</span></div>
+  </div>
+
+  <div class="inner-tabs">
+    <button class="inner-tab active" onclick="switchInnerTab('a5','upload',this)">Upload image</button>
+    <button class="inner-tab" onclick="switchInnerTab('a5','paste',this)">Paste text / data</button>
+  </div>
+
+  <div id="a5-upload">
+    <div class="upload-zone" id="a5-zone" onclick="document.getElementById('a5-file').click()" ondragover="dov(event,'a5-zone')" ondragleave="dlv('a5-zone')" ondrop="drf(event,'a5-file','a5-zone','a5-img','a5')">
+      <span class="uz-icon">📊</span>
+      <p>Click to upload or drag & drop a chart, report, table, or document image</p>
+      <p style="font-size:12px;margin-top:4px;color:var(--ink4)">PNG, JPG, GIF — try a financial chart, budget table, or any business visual</p>
+      <input type="file" id="a5-file" accept="image/*" onchange="prevImg('a5-file','a5-img','a5-fname','a5')">
+    </div>
+    <img class="img-preview" id="a5-img" alt="preview">
+    <div id="a5-fname" style="font-size:12px;color:var(--ink3);margin-top:4px"></div>
+  </div>
+  <div id="a5-paste" style="display:none">
+    <textarea id="a5-text" style="min-height:110px" placeholder="Paste your business data, report excerpt, financial figures, or any text content here…"></textarea>
+    <button onclick="loadSampleBudget()" style="margin-top:6px;font-size:12px">Load sample financial data</button>
+  </div>
+
+  <span class="field-label" style="margin-top:12px">What should the AI do?</span>
+  <select id="a5-task">
+    <option value="Summarise this document, analysing both the text and the charts. Highlight 5 key takeaways including economic patterns, major spending areas and any significant changes.">5 key takeaways (budget/report style)</option>
+    <option value="Extract the 3 most important insights from this content and for each one, recommend a specific action a manager should take.">Extract insights + recommended actions</option>
+    <option value="Identify all risks, anomalies, and red flags. Prioritise them by severity (High/Medium/Low) and explain the potential impact of each.">Risk and red flag analysis</option>
+    <option value="Summarise this for a non-technical executive in exactly 3 bullet points. Each bullet must be clear, jargon-free and actionable.">Executive summary (3 bullets)</option>
+    <option value="You are a management consultant. Write a structured analysis report with sections: Key Findings, Root Causes, Strategic Recommendations, and Next Steps.">Consultant analysis report</option>
+  </select>
+  <div class="row">
+    <button class="btn-p" onclick="runA5(20)">Analyse ↗</button>
+    <button onclick="clearA5()">Clear</button>
+  </div>
+  <div class="resp-box" id="a5-resp"><div class="resp-label"><span class="dot"></span>AI Response</div><div class="resp-text" id="a5-text-resp"></div></div>
+</div>
+
+<!-- ══ ACTIVITY 6: MULTIMODAL — CONTENT GENERATION ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-green">Activity 6</span>
+      <span style="font-size:12px;color:var(--ink3)">Multimodal prompting · Writing task</span>
+    </div>
+    <span class="pts-chip">+20 pts</span>
+  </div>
+  <div class="act-title">Generate business content from a visual</div>
+  <div class="act-scenario">
+    <strong>Scenario:</strong> Upload a product photo, marketing image, or chart and use AI to generate professional business content from it. Other applications: creative writing from visuals, captioning infographics, analysing scientific figures.
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Upload</span> a product image, marketing visual, or chart — or describe one in the text field.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Choose</span> the type of content to generate.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Review</span> the AI output. How well did it capture the visual's content and intent?</span></div>
+  </div>
+
+  <div class="upload-zone" id="a6-zone" onclick="document.getElementById('a6-file').click()" ondragover="dov(event,'a6-zone')" ondragleave="dlv('a6-zone')" ondrop="drf(event,'a6-file','a6-zone','a6-img','a6')">
+    <span class="uz-icon">🖼️</span>
+    <p>Upload a product photo, marketing image, or chart visual</p>
+    <p style="font-size:12px;margin-top:4px;color:var(--ink4)">Or describe it in the text field below</p>
+    <input type="file" id="a6-file" accept="image/*" onchange="prevImg('a6-file','a6-img','a6-fname','a6')">
+  </div>
+  <img class="img-preview" id="a6-img" alt="preview">
+  <div id="a6-fname" style="font-size:12px;color:var(--ink3);margin-top:4px"></div>
+
+  <span class="field-label">Or describe what you see</span>
+  <textarea id="a6-desc" style="min-height:60px" placeholder="e.g. 'A bar chart showing Q1=120k, Q2=145k, Q3=98k, Q4=210k revenue' or 'A photo of a matte black eco-friendly water bottle on white background'"></textarea>
+
+  <span class="field-label">Generate</span>
+  <select id="a6-task">
+    <option value="Write 3 distinct social media captions for this visual — one for LinkedIn (professional tone), one for Instagram (lifestyle tone), and one for Twitter/X (punchy tone). Include relevant hashtags for each.">3 social media captions (LinkedIn, Instagram, X)</option>
+    <option value="Write a compelling 150-word investor pitch paragraph based on this visual. Focus on market opportunity, differentiation and traction.">Investor pitch paragraph</option>
+    <option value="Write a persuasive marketing email about this. Include subject line, opening line, body (2 paragraphs), and a clear call to action.">Marketing email with subject line</option>
+    <option value="Generate a short story (150 words) based on this image. Make it engaging and relevant to a business or university audience.">Generate a story from this image</option>
+    <option value="Write captions and a brief analysis for this infographic or marketing visual. Explain what it communicates effectively and suggest one improvement.">Caption and analyse this visual</option>
+    <option value="Write product copy for this: a punchy headline, a 2-sentence description, 4 key features as bullet points, and a call-to-action button label.">Product copy (headline + features + CTA)</option>
+  </select>
+  <div class="row">
+    <button class="btn-p" onclick="runA6(20)">Generate ↗</button>
+    <button onclick="clearA6()">Clear</button>
+  </div>
+  <div class="resp-box" id="a6-resp"><div class="resp-label"><span class="dot"></span>AI Response</div><div class="resp-text" id="a6-text-resp"></div></div>
+</div>
+
+<!-- ══ ACTIVITY 7: TREE-OF-THOUGHT ══ -->
+<div class="act-card">
+  <div class="act-header">
+    <div class="act-header-left">
+      <span class="badge b-purple">Activity 7</span>
+      <span style="font-size:12px;color:var(--ink3)">Tree-of-thought prompting</span>
+    </div>
+    <span class="pts-chip">+15 pts</span>
+  </div>
+  <div class="act-title">Strategic decision using tree-of-thought (ToT)</div>
+  <div class="act-scenario">
+    <strong>How ToT works:</strong> Think of a leadership team deciding on a new office location — first they explore possible regions, then narrow down by considering rent, access and team preferences, then select the most suitable site. ToT mirrors this: it opens options, analyses them and selects the best fit.
+  </div>
+  <div class="act-tasks">
+    <div class="act-task"><span class="task-num">1</span><span><span class="task-verb">Choose</span> a business scenario that requires comparing multiple options.</span></div>
+    <div class="act-task"><span class="task-num">2</span><span><span class="task-verb">Prompt</span> the AI to explore each option as a separate branch, evaluate them, then recommend the best.</span></div>
+    <div class="act-task"><span class="task-num">3</span><span><span class="task-verb">Reflect:</span> How did ToT produce a different result from a simple direct prompt?</span></div>
+  </div>
+
+  <span class="field-label">Choose a scenario</span>
+  <select onchange="fillP('a7-prompt',this.value)">
+    <option value="">— select or write your own below —</option>
+    <option value="You are helping a Melbourne-based business decide where to expand. Consider three cities: Sydney, Brisbane, and Adelaide. For each city, explore: market size, competition, cost of entry, and growth potential. Evaluate each branch, eliminate the least promising options, and recommend the best choice with detailed reasons.">Market expansion (3 cities)</option>
+    <option value="A startup must choose between three go-to-market strategies: (A) direct sales team, (B) online self-serve, (C) channel partners. For each strategy, explore: cost, speed to revenue, scalability, and risk. Eliminate weaker options and recommend the best approach with reasons.">Go-to-market strategy</option>
+    <option value="A university café is considering three new product lines: (A) fresh juice bar, (B) hot food meals, (C) premium coffee range. For each option, evaluate: setup cost, profit margin, student demand, and operational complexity. Eliminate weaker options and recommend the best one.">Café product expansion</option>
+    <option value="A small business must decide how to invest its $20,000 marketing budget across three options: (A) social media advertising, (B) a local event sponsorship, (C) influencer partnerships. For each, explore: reach, cost per customer, brand fit, and ROI potential. Recommend the best allocation.">Marketing budget allocation</option>
+  </select>
+  <span class="field-label">Your ToT prompt</span>
+  <textarea id="a7-prompt" placeholder="Ask the AI to explore multiple branches of a decision, evaluate each, then converge on the best recommendation…"></textarea>
+  <div class="row">
+    <button class="btn-p" onclick="runAI('a7','tree-of-thought',15)">Run ↗</button>
+    <button onclick="clearAct('a7')">Clear</button>
+  </div>
+  <div class="resp-box" id="a7-resp"><div class="resp-label"><span class="dot"></span>AI Response</div><div class="resp-text" id="a7-text"></div></div>
+</div>
+
+</div><!-- end activities panel -->
+
+<!-- ════ LEADERBOARD ════ -->
+<div id="leaderboard" class="panel">
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-val" id="s-users">0</div><div class="stat-lbl">Online now</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-acts">0</div><div class="stat-lbl">Activities done</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-my">0</div><div class="stat-lbl">Your score</div></div>
+    <div class="stat-card"><div class="stat-val" id="s-rank">#–</div><div class="stat-lbl">Your rank</div></div>
+  </div>
+  <div class="lb-wrap">
+    <div class="lb-head"><h3>🏆 Live Leaderboard</h3><span id="lb-ts">Updates every 10s</span></div>
+    <div id="lb-body"><div class="lb-empty">Complete activities to appear on the leaderboard.</div></div>
+  </div>
+  <div style="text-align:center;margin-top:1rem">
+    <button onclick="refreshLB()">Refresh now</button>
+    <span style="font-size:12px;color:var(--ink4);margin-left:10px">Auto-refreshes every 10 seconds</span>
+  </div>
+</div>
+
+<!-- ════ LIVE USERS ════ -->
+<div id="users" class="panel">
+  <div style="background:var(--card);border:1px solid var(--b1);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:1.4rem;font-size:13px;color:var(--ink2)">
+    See who else is in the workshop right now. The platform supports 30–40 simultaneous users all sharing the same live leaderboard.
+  </div>
+  <div class="sec-div">Online now</div>
+  <div class="users-grid" id="users-grid"><div style="font-size:13px;color:var(--ink3)">Loading users…</div></div>
+  <div style="text-align:center;margin-top:1rem"><button onclick="refreshUsers()">Refresh</button></div>
+</div>
+
+<!-- ════ STUDENT PROMPTS ════ -->
+<div id="prompts" class="panel">
+  <div style="background:var(--card);border:1px solid var(--b1);border-radius:var(--r-sm);padding:12px 16px;margin-bottom:1.2rem;font-size:13px;color:var(--ink2);line-height:1.65">
+    Every prompt submitted by students during the workshop appears here in real time. Use the filters to see prompts by activity or student. This helps you understand how students are applying each technique.
+  </div>
+
+  <div class="plog-filter-row">
+    <label>Filter by activity:</label>
+    <select id="plog-act-filter" onchange="renderPrompts()">
+      <option value="">All activities</option>
+      <option value="a1">Activity 1 — Snack brand launch</option>
+      <option value="a2">Activity 2 — Direct vs step-by-step</option>
+      <option value="a3">Activity 3 — HR job role design</option>
+      <option value="a4">Activity 4 — Playoff method</option>
+      <option value="a5">Activity 5 — Multimodal document analysis</option>
+      <option value="a6">Activity 6 — Generate content from visual</option>
+      <option value="a7">Activity 7 — Tree-of-thought</option>
+    </select>
+    <input type="text" id="plog-search" placeholder="Search by name or prompt…" oninput="renderPrompts()" style="flex:1;min-width:160px">
+    <button onclick="renderPrompts()">Refresh</button>
+    <button onclick="clearAllPrompts()" style="color:var(--red);border-color:var(--red-l)">Clear all</button>
+  </div>
+
+  <div class="plog-count" id="plog-count"></div>
+  <div id="plog-list"></div>
+</div>
+
+</main>
+<footer id="main-footer" style="display:none">La Trobe University · AI Workshop · Powered by Claude AI (Anthropic)</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══ STATE ══ */
+let CU=null, myScore=0, myActs=0, lbInt=null;
+let imgData={};
+let a1ChatHist=[], a1ChatActive=false;
+let a3Hist=[], a3Active=false;
+let a4Options=[], a4W1=null, a4W2=null;
+let a2BothDone=false, a2DirectDone=false, a2CotDone=false;
+
+/* ══ STORAGE ══ */
+const SK=k=>'ltw2_'+k;
+const getU=()=>{try{return JSON.parse(localStorage.getItem(SK('u'))||'{}')}catch{return{}}};
+const setU=u=>localStorage.setItem(SK('u'),JSON.stringify(u));
+const getSc=()=>{try{return JSON.parse(localStorage.getItem(SK('s'))||'{}')}catch{return{}}};
+const setSc=s=>localStorage.setItem(SK('s'),JSON.stringify(s));
+
+function addScore(pts){
+  myScore+=pts; myActs++;
+  const sc=getSc();
+  sc[CU.id]={name:CU.display,firstName:CU.name,studentId:CU.id,score:myScore,acts:myActs,ts:Date.now()};
+  setSc(sc);
+  document.getElementById('s-my').textContent=myScore;
+  document.getElementById('nav-score').textContent=myScore+' pts';
+  showToast('+'+pts+' pts! Total: '+myScore);
+  refreshLB();
+}
+function heartbeat(){
+  if(!CU)return;
+  const u=getU();
+  u[CU.id]={name:CU.display,firstName:CU.name,studentId:CU.id,initials:CU.ini,ts:Date.now()};
+  setU(u);
+}
+
+/* ══ PROMPT LOG ══ */
+function getPrompts(){try{return JSON.parse(localStorage.getItem(SK('prompts'))||'[]')}catch{return[]}}
+function savePrompt(activityId,activityTitle,prompt){
+  const all=getPrompts();
+  all.push({
+    id:CU.id,
+    name:CU.display,
+    firstName:CU.name,
+    studentId:CU.id,
+    activityId,
+    activityTitle,
+    prompt:prompt.length>600?prompt.substr(0,600)+'…':prompt,
+    ts:Date.now()
+  });
+  // keep last 500 entries
+  if(all.length>500)all.splice(0,all.length-500);
+  localStorage.setItem(SK('prompts'),JSON.stringify(all));
+}
+
+/* ══ DISPLAY NAME AUTO-GEN ══ */
+function genDisplay(){
+  const name=document.getElementById('l-name').value.trim();
+  const id=document.getElementById('l-id').value.trim();
+  const chip=document.getElementById('display-chip');
+  if(!name){chip.style.display='none';return;}
+  const display=id?`${name} (${id})`:name;
+  const ini=name.substr(0,2).toUpperCase();
+  document.getElementById('dc-av').textContent=ini;
+  document.getElementById('dc-name').textContent=display;
+  chip.style.display='flex';
+}
+
+/* ══ LOGIN ══ */
+function doLogin(){
+  const name=document.getElementById('l-name').value.trim();
+  const id=document.getElementById('l-id').value.trim();
+  if(!name){document.getElementById('l-err').textContent='Please enter your first name.';return;}
+  if(!id){document.getElementById('l-err').textContent='Please enter your student ID.';return;}
+  const sid=id;
+  const display=`${name} (${id})`;
+  const ini=name.substr(0,2).toUpperCase();
+  CU={name,id:sid,display,ini};
+  heartbeat();
+  document.getElementById('login-screen').style.display='none';
+  ['main-nav','main-hero','main-tabs','main-content','main-footer'].forEach(i=>document.getElementById(i).style.display='');
+  document.getElementById('nav-uname').textContent=CU.display;
+  document.getElementById('nav-av').textContent=CU.ini;
+  document.getElementById('nav-score').textContent='0 pts';
+  refreshLB(); refreshUsers();
+  lbInt=setInterval(()=>{refreshLB();refreshUsers();heartbeat();},10000);
+  showToast('Welcome, '+CU.display+'! 👋');
+}
+document.getElementById('l-name').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-id').focus()});
+document.getElementById('l-id').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+function doLogout(){if(!confirm('Leave the workshop?'))return;clearInterval(lbInt);location.reload();}
+
+/* ══ API ══ */
+function getKey(){
+  const el=document.getElementById('api-key');
+  return el?el.value.trim():'';
+}
+function updateApiStatus(){
+  const k=getKey(),s=document.getElementById('api-status');
+  if(k.startsWith('sk-ant-')&&k.length>20){s.textContent='✓ Key set';s.className='api-status set'}
+  else if(k.length>0){s.textContent='Invalid format';s.className='api-status unset'}
+  else{s.textContent='Not set';s.className='api-status unset'}
+}
+
+/* ══ TABS ══ */
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='leaderboard')refreshLB();
+  if(id==='users')refreshUsers();
+  if(id==='prompts')renderPrompts();
+}
+function switchInnerTab(prefix,tab,btn){
+  btn.closest('.act-card').querySelectorAll('.inner-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const map={'a1':['writing','reading','chat'],'a5':['upload','paste']};
+  (map[prefix]||[tab]).forEach(t=>{
+    const el=document.getElementById(prefix+'-'+t);
+    if(el)el.style.display=(t===tab?'':'none');
+  });
+}
+
+/* ══ HELPERS ══ */
+function fillP(id,val){if(val)document.getElementById(id).value=val;}
+function clearAct(p){
+  const ta=document.getElementById(p+'-prompt');if(ta)ta.value='';
+  const r=document.getElementById(p+'-resp');if(r){r.classList.remove('on');}
+  const t=document.getElementById(p+'-text');if(t)t.textContent='';
+}
+
+/* ══ CLAUDE API ══ */
+function mockClaudeResponse(userMsg,sysMsg){
+  const preview=userMsg.length>600?userMsg.slice(0,600)+'…':userMsg;
+  return `Demo mode — no Anthropic API key detected.\n\n`+
+    `This page is running in offline/demo mode, so it cannot call the real Claude API.\n\n`+
+    `SYSTEM (preview): ${sysMsg.slice(0,220)}${sysMsg.length>220?'…':''}\n\n`+
+    `PROMPT PREVIEW:\n${preview}\n\n`+
+    `In the real workshop, Claude would return a professional, concise answer tailored to this activity.`;
+}
+async function callClaude(userMsg,sysMsg,imgB64,imgType){
+  const key=getKey();
+  // If no key is provided, fall back to a simulated local response instead of throwing.
+  if(!key){
+    return mockClaudeResponse(userMsg,sysMsg);
+  }
+  if(!key.startsWith('sk-ant-'))throw new Error('Invalid API key format — should start with sk-ant-');
+  let content=imgB64
+    ?[{type:'image',source:{type:'base64',media_type:imgType||'image/jpeg',data:imgB64}},{type:'text',text:userMsg}]
+    :userMsg;
+  const res=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:sysMsg,messages:[{role:'user',content}]})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error.message);
+  return d.content?.[0]?.text||'No response.';
+}
+
+const ACTIVITY_TITLES={
+  'a1':'Activity 1 — Snack brand launch',
+  'a2':'Activity 2 — Direct vs step-by-step',
+  'a3':'Activity 3 — HR job role design',
+  'a4':'Activity 4 — Playoff method',
+  'a5':'Activity 5 — Multimodal document analysis',
+  'a6':'Activity 6 — Generate content from visual',
+  'a7':'Activity 7 — Tree-of-thought'
+};
+
+/* ══ GENERIC RUN AI ══ */
+async function runAI(prefix,technique,pts){
+  const prompt=document.getElementById(prefix+'-prompt').value.trim();
+  if(!prompt){showToast('Please enter a prompt first.');return;}
+  const card=document.getElementById(prefix+'-prompt').closest('.act-card');
+  const btn=card.querySelector('.btn-p');
+  const resp=document.getElementById(prefix+'-resp');
+  const txt=document.getElementById(prefix+'-text');
+  btn.disabled=true; resp.classList.add('on'); txt.textContent='Generating…';
+  try{
+    const sys=`You are a helpful business AI assistant for a La Trobe University workshop. The student is practising the "${technique}" prompting technique. Respond professionally and concisely. Max 260 words.`;
+    txt.textContent=await callClaude(prompt,sys);
+    savePrompt(prefix, ACTIVITY_TITLES[prefix]||prefix, prompt);
+    addScore(pts);
+  }catch(e){txt.textContent='Error: '+e.message;}
+  btn.disabled=false;
+}
+
+/* ══ ACTIVITY 1: CHAT ══ */
+async function startChatA1(){
+  const prompt=document.getElementById('a1-prompt').value.trim();
+  if(!prompt){showToast('Please enter a prompt first.');return;}
+  a1ChatHist=[]; a1ChatActive=true;
+  const convo=document.getElementById('a1-convo');
+  convo.innerHTML=''; convo.classList.add('on');
+  document.getElementById('a1-reply-row').style.display='';
+  addMsgTo('a1-convo','ai','Starting…');
+  try{
+    const sys='You are a helpful business AI assistant in a chat application for a La Trobe University workshop. Engage conversationally, keep track of context, and respond to follow-up questions. Keep each response under 100 words.';
+    const resp=await callClaude(prompt,sys);
+    a1ChatHist.push({role:'user',content:prompt},{role:'assistant',content:resp});
+    document.getElementById('a1-convo').lastChild.querySelector('.msg').textContent=resp;
+    savePrompt('a1', ACTIVITY_TITLES['a1']+' (chat)', prompt);
+    addScore(10);
+  }catch(e){document.getElementById('a1-convo').lastChild.querySelector('.msg').textContent='Error: '+e.message;}
+}
+async function sendChatA1(){
+  const input=document.getElementById('a1-reply');
+  const reply=input.value.trim(); if(!reply||!a1ChatActive)return;
+  input.value=''; addMsgTo('a1-convo','user',reply);
+  a1ChatHist.push({role:'user',content:reply}); addMsgTo('a1-convo','ai','…');
+  try{
+    const key=getKey();
+    let text;
+    if(!key){
+      // Demo fallback when no API key is present.
+      text=mockClaudeResponse(reply,'You are a helpful business AI assistant. Keep responses concise and conversational, max 100 words.');
+    }else{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,system:'You are a helpful business AI assistant. Keep responses concise and conversational, max 100 words.',messages:a1ChatHist})
+      });
+      const data=await res.json(); if(data.error)throw new Error(data.error.message);
+      text=data.content?.[0]?.text||'No response.';
+    }
+    a1ChatHist.push({role:'assistant',content:text});
+    document.getElementById('a1-convo').lastChild.querySelector('.msg').textContent=text;
+  }catch(e){document.getElementById('a1-convo').lastChild.querySelector('.msg').textContent='Error: '+e.message;}
+}
+function clearChatA1(){
+  a1ChatHist=[]; a1ChatActive=false;
+  const c=document.getElementById('a1-convo'); c.innerHTML=''; c.classList.remove('on');
+  document.getElementById('a1-reply-row').style.display='none';
+}
+
+/* ══ ACTIVITY 2: COMPARE ══ */
+async function runCompare(mode){
+  const prompt=document.getElementById('a2-'+mode).value.trim();
+  if(!prompt){showToast('Please enter a prompt.');return;}
+  document.getElementById('a2-compare').style.display='grid';
+  const el=document.getElementById('a2-'+mode+'-resp');
+  el.textContent='Running…';
+  try{
+    const sys=mode==='direct'
+      ?'You are a precise calculator. Answer the question directly with only the final dollar amount. No explanation, no steps. Just the number in dollars.'
+      :'You are a precise calculator. Think through this step by step, showing every calculation clearly. Put the final total on the last line starting with "Total:"';
+    const result=await callClaude(prompt,sys);
+    el.textContent=result;
+    if(mode==='direct')a2DirectDone=true; else a2CotDone=true;
+    savePrompt('a2', ACTIVITY_TITLES['a2']+' ('+(mode==='direct'?'direct':'step-by-step')+')', prompt);
+    if(a2DirectDone&&a2CotDone&&!a2BothDone){
+      a2BothDone=true;
+      document.getElementById('a2-reflection-row').style.display='block';
+      addScore(15);
+    }
+  }catch(e){el.textContent='Error: '+e.message;}
+}
+function markTrust(mode,val,btn){
+  btn.closest('.trust-row').querySelectorAll('.trust-btn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+async function submitA2Reflection(){
+  const reflection=document.getElementById('a2-reflection').value.trim();
+  if(!reflection){showToast('Please write your reflection first.');return;}
+  const resp=document.getElementById('a2-fb-resp');
+  const txt=document.getElementById('a2-fb-text');
+  resp.classList.add('on'); txt.textContent='Getting feedback…';
+  try{
+    const p=`Student reflected on direct vs step-by-step prompts for a maths problem.\nStudent's reflection: "${reflection}"\nGive brief encouraging feedback (max 60 words): Was their insight valid? What is the key learning about when to use each approach?`;
+    txt.textContent=await callClaude(p,'You are an encouraging prompt engineering coach. Be brief and specific.');
+  }catch(e){txt.textContent='Error: '+e.message;}
+}
+
+/* ══ ACTIVITY 3: INTERVIEW PATTERN ══ */
+async function startA3(){
+  const prompt=document.getElementById('a3-prompt').value.trim();
+  if(!prompt){showToast('Please enter a prompt.');return;}
+  a3Hist=[]; a3Active=true;
+  const convo=document.getElementById('a3-convo');
+  convo.innerHTML=''; convo.classList.add('on');
+  document.getElementById('a3-reply-row').style.display='';
+  addMsgTo('a3-convo','ai','Starting…');
+  try{
+    const sys='You are an experienced HR consultant conducting a job role design session. Ask the user detailed questions one at a time to gather information about the role. When you have enough information (at least 4-5 questions answered), write a complete, professional job description. Prefix the final job description with FINAL JOB DESCRIPTION:';
+    const resp=await callClaude(prompt,sys);
+    a3Hist.push({role:'user',content:prompt},{role:'assistant',content:resp});
+    document.getElementById('a3-convo').lastChild.querySelector('.msg').textContent=resp;
+    savePrompt('a3', ACTIVITY_TITLES['a3'], prompt);
+  }catch(e){document.getElementById('a3-convo').lastChild.querySelector('.msg').textContent='Error: '+e.message;}
+}
+async function sendA3(){
+  const input=document.getElementById('a3-reply');
+  const reply=input.value.trim(); if(!reply||!a3Active)return;
+  input.value=''; addMsgTo('a3-convo','user',reply);
+  a3Hist.push({role:'user',content:reply}); addMsgTo('a3-convo','ai','…');
+  try{
+    const key=getKey();
+    let text;
+    if(!key){
+      // Demo fallback when no API key is present.
+      text=mockClaudeResponse(reply,'You are an experienced HR consultant conducting a job role design session. Continue asking questions one at a time. When you have enough information, write a complete, professional job description prefixed with FINAL JOB DESCRIPTION:');
+    }else{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,system:'You are an experienced HR consultant conducting a job role design session. Continue asking questions one at a time. When you have enough information (after at least 4-5 exchanges), write a complete, professional job description prefixed with FINAL JOB DESCRIPTION:',messages:a3Hist})
+      });
+      const data=await res.json(); if(data.error)throw new Error(data.error.message);
+      text=data.content?.[0]?.text||'No response.';
+    }
+    a3Hist.push({role:'assistant',content:text});
+    document.getElementById('a3-convo').lastChild.querySelector('.msg').textContent=text;
+    if(text.includes('FINAL JOB DESCRIPTION:')){addScore(15);a3Active=false;document.getElementById('a3-reply-row').style.display='none';}
+  }catch(e){document.getElementById('a3-convo').lastChild.querySelector('.msg').textContent='Error: '+e.message;}
+}
+function clearA3(){
+  a3Hist=[]; a3Active=false;
+  const c=document.getElementById('a3-convo'); c.innerHTML=''; c.classList.remove('on');
+  document.getElementById('a3-reply-row').style.display='none';
+}
+function addMsgTo(convoId,role,text){
+  const convo=document.getElementById(convoId);
+  const d=document.createElement('div');
+  d.innerHTML=`<div class="msg msg-${role}"><div class="msg-label">${role==='ai'?'Claude AI':'You'}</div>${text}</div>`;
+  convo.appendChild(d); convo.scrollTop=convo.scrollHeight;
+}
+
+/* ══ ACTIVITY 4: PLAYOFF ══ */
+async function runPlayoff(){
+  const prompt=document.getElementById('a4-prompt').value.trim();
+  if(!prompt){showToast('Please enter a prompt.');return;}
+  const btn=document.querySelector('#a4-prompt').closest('.act-card').querySelector('.btn-p');
+  btn.disabled=true;
+  document.getElementById('a4-loading').style.display='block';
+  document.getElementById('a4-stage1').style.display='none';
+  document.getElementById('a4-stage2').style.display='none';
+  document.getElementById('a4-winner-wrap').style.display='none';
+  a4Options=[]; a4W1=null; a4W2=null;
+  try{
+    const sys='Return ONLY a valid JSON array of exactly 4 short strings (taglines, under 12 words each). No markdown, no explanation, just the JSON array.';
+    const full=`${prompt}\n\nReturn ONLY a JSON array of exactly 4 strings: ["tagline1","tagline2","tagline3","tagline4"]`;
+    const raw=await callClaude(full,sys);
+    let cleaned=raw.replace(/```json|```/g,'').trim();
+    try{a4Options=JSON.parse(cleaned);}catch{
+      const m=cleaned.match(/\[[\s\S]*?\]/);
+      if(m)a4Options=JSON.parse(m[0]); else throw new Error('Could not parse 4 options.');
+    }
+    if(!Array.isArray(a4Options)||a4Options.length<4)throw new Error('Need exactly 4 options.');
+    renderA4Round1();
+    savePrompt('a4', ACTIVITY_TITLES['a4'], prompt);
+    addScore(20);
+  }catch(e){showToast('Error: '+e.message);}
+  document.getElementById('a4-loading').style.display='none';
+  btn.disabled=false;
+}
+function renderA4Round1(){
+  document.getElementById('a4-stage1').style.display='block';
+  document.getElementById('a4-opts12').innerHTML=renderPair(0,1,'pair1');
+  document.getElementById('a4-opts34').innerHTML=renderPair(2,3,'pair2');
+}
+function renderPair(i,j,pairId){
+  return [i,j].map(idx=>`
+    <div class="po-opt" id="po-opt-${idx}">
+      <div class="po-opt-num">Option ${idx+1}</div>
+      <div class="po-opt-text">${a4Options[idx]}</div>
+      <button class="po-choose-btn" onclick="choosePair('${pairId}',${idx})">Choose this ✓</button>
+    </div>`).join('');
+}
+function choosePair(pairId,idx){
+  const isPair1=pairId==='pair1';
+  const [a,b]=isPair1?[0,1]:[2,3];
+  document.getElementById('po-opt-'+a).classList.toggle('chosen',a===idx);
+  document.getElementById('po-opt-'+a).classList.toggle('loser',a!==idx);
+  document.getElementById('po-opt-'+b).classList.toggle('chosen',b===idx);
+  document.getElementById('po-opt-'+b).classList.toggle('loser',b!==idx);
+  if(isPair1)a4W1=a4Options[idx]; else a4W2=a4Options[idx];
+  if(a4W1&&a4W2)renderA4Final();
+}
+function renderA4Final(){
+  document.getElementById('a4-stage2').style.display='block';
+  document.getElementById('a4-finalists').innerHTML=[a4W1,a4W2].map((w,i)=>`
+    <div class="po-opt" id="po-fin-${i}">
+      <div class="po-opt-num">Finalist ${i+1}</div>
+      <div class="po-opt-text">${w}</div>
+      <button class="po-choose-btn" onclick="chooseFinal(${i})">🏆 This is the winner</button>
+    </div>`).join('');
+  document.getElementById('a4-stage2').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function chooseFinal(i){
+  const winner=i===0?a4W1:a4W2;
+  document.getElementById('po-fin-0').classList.toggle('chosen',i===0);
+  document.getElementById('po-fin-0').classList.toggle('loser',i!==0);
+  document.getElementById('po-fin-1').classList.toggle('chosen',i===1);
+  document.getElementById('po-fin-1').classList.toggle('loser',i!==1);
+  document.getElementById('a4-winner-text').textContent=winner;
+  document.getElementById('a4-winner-wrap').style.display='block';
+  document.getElementById('a4-winner-wrap').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+async function submitA4(){
+  const winner=document.getElementById('a4-winner-text').textContent;
+  const reason=document.getElementById('a4-reason').value.trim();
+  if(!reason){showToast('Please explain your choice first.');return;}
+  const resp=document.getElementById('a4-resp');
+  const txt=document.getElementById('a4-text');
+  resp.classList.add('on'); txt.textContent='Getting feedback…';
+  try{
+    const p=`Student used the playoff method.\nWinning tagline chosen: "${winner}"\nReason: "${reason}"\nGive brief encouraging feedback in max 70 words: Was their reasoning sound? What makes this a strong tagline? Any insight on what makes taglines effective?`;
+    txt.textContent=await callClaude(p,'You are an encouraging prompt engineering coach. Be brief, warm and specific.');
+  }catch(e){txt.textContent='Error: '+e.message;}
+}
+function resetPlayoff(){
+  a4Options=[]; a4W1=null; a4W2=null;
+  ['a4-stage1','a4-stage2','a4-winner-wrap','a4-loading'].forEach(id=>document.getElementById(id).style.display='none');
+  document.getElementById('a4-resp').classList.remove('on');
+}
+
+/* ══ ACTIVITY 5: MULTIMODAL ANALYSIS ══ */
+async function runA5(pts){
+  const task=document.getElementById('a5-task').value;
+  const isPaste=document.getElementById('a5-paste').style.display!=='none';
+  let content='', imgB64=null, imgType=null;
+  if(isPaste){
+    content=document.getElementById('a5-text').value.trim();
+    if(!content){showToast('Please paste some content first.');return;}
+  }else{
+    if(imgData['a5']){imgB64=imgData['a5'].data; imgType=imgData['a5'].type;}
+    else{showToast('Please upload an image or switch to Paste mode.');return;}
+  }
+  const btn=document.getElementById('a5-zone')?document.getElementById('a5-zone').closest('.act-card').querySelector('.btn-p'):null;
+  const resp=document.getElementById('a5-resp');
+  const txt=document.getElementById('a5-text-resp');
+  if(btn)btn.disabled=true; resp.classList.add('on'); txt.textContent='Analysing…';
+  try{
+    const prompt=content?`Business content:\n\n${content}\n\nTask: ${task}`:`Task: ${task}`;
+    txt.textContent=await callClaude(prompt,'You are a business intelligence AI. Be concise, practical and professional. Max 280 words.',imgB64,imgType);
+    savePrompt('a5', ACTIVITY_TITLES['a5'], isPaste?document.getElementById('a5-text').value.trim():'[Image uploaded]');
+    addScore(pts);
+  }catch(e){txt.textContent='Error: '+e.message;}
+  if(btn)btn.disabled=false;
+}
+function clearA5(){
+  imgData['a5']=null;
+  const img=document.getElementById('a5-img'); if(img){img.classList.remove('on');img.src='';}
+  document.getElementById('a5-fname').textContent='';
+  document.getElementById('a5-text').value='';
+  document.getElementById('a5-resp').classList.remove('on');
+  document.getElementById('a5-text-resp').textContent='';
+}
+function loadSampleBudget(){
+  document.getElementById('a5-text').value=`Q1 Revenue: $142,000\nQ2 Revenue: $168,000\nQ3 Revenue: $109,000\nQ4 Revenue: $201,000\n\nTop product: Premium coffee blends (42% of revenue)\nCustomer return rate: 3.2% (industry avg: 1.8%)\nNew customers Q4: 847 · Repeat customer rate: 61%\nStaff turnover 2024: 34%\nAverage order value: $87 (was $94 in 2023)\nNPS score: 42 (benchmark: 55)\nOnline reviews: 4.1/5 (down from 4.6)`;
+}
+
+/* ══ ACTIVITY 6: MULTIMODAL CONTENT GEN ══ */
+async function runA6(pts){
+  const task=document.getElementById('a6-task').value;
+  const imgB64=imgData['a6']?.data||null;
+  const imgType=imgData['a6']?.type||null;
+  const desc=document.getElementById('a6-desc').value.trim();
+  if(!imgB64&&!desc){showToast('Please upload an image or describe it in the text field.');return;}
+  const resp=document.getElementById('a6-resp');
+  const txt=document.getElementById('a6-text-resp');
+  resp.classList.add('on'); txt.textContent='Generating…';
+  try{
+    const prompt=desc?`Visual description: ${desc}\n\nTask: ${task}`:`Task: ${task}`;
+    txt.textContent=await callClaude(prompt,'You are a professional business content writer. Be creative, precise and professional. Max 280 words.',imgB64,imgType);
+    savePrompt('a6', ACTIVITY_TITLES['a6'], desc||'[Image uploaded] Task: '+task.substr(0,80));
+    addScore(pts);
+  }catch(e){txt.textContent='Error: '+e.message;}
+}
+function clearA6(){
+  imgData['a6']=null;
+  const img=document.getElementById('a6-img'); if(img){img.classList.remove('on');img.src='';}
+  document.getElementById('a6-fname').textContent='';
+  document.getElementById('a6-desc').value='';
+  document.getElementById('a6-resp').classList.remove('on');
+  document.getElementById('a6-text-resp').textContent='';
+}
+
+/* ══ IMAGE UPLOAD ══ */
+function prevImg(inputId,imgId,fnId,prefix){
+  const file=document.getElementById(inputId).files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const b64=e.target.result.split(',')[1];
+    imgData[prefix]={data:b64,type:file.type};
+    const img=document.getElementById(imgId); img.src=e.target.result; img.classList.add('on');
+    document.getElementById(fnId).textContent='📎 '+file.name;
+  };
+  reader.readAsDataURL(file);
+}
+function dov(e,z){e.preventDefault();document.getElementById(z).classList.add('dragover');}
+function dlv(z){document.getElementById(z).classList.remove('dragover');}
+function drf(e,fi,z,ii,p){
+  e.preventDefault(); dlv(z);
+  const file=e.dataTransfer.files[0];
+  if(!file||!file.type.startsWith('image/'))return;
+  const dt=new DataTransfer(); dt.items.add(file);
+  document.getElementById(fi).files=dt.files;
+  const fn=z.replace('-zone','-fname');
+  prevImg(fi,ii,fn,p);
+}
+
+/* ══ LEADERBOARD ══ */
+function refreshLB(){
+  const sc=getSc(), now=Date.now();
+  const active=Object.entries(sc).filter(([,v])=>now-v.ts<30*60*1000).sort((a,b)=>b[1].score-a[1].score);
+  const totalA=active.reduce((s,[,v])=>s+v.acts,0);
+  document.getElementById('s-users').textContent=active.length;
+  document.getElementById('s-acts').textContent=totalA;
+  document.getElementById('s-my').textContent=myScore;
+  const myRank=active.findIndex(([id])=>id===CU?.id);
+  document.getElementById('s-rank').textContent=myRank>=0?'#'+(myRank+1):'#–';
+  if(active.length===0){document.getElementById('lb-body').innerHTML='<div class="lb-empty">Complete activities to appear on the leaderboard.</div>';return;}
+  const med=['🥇','🥈','🥉'],rc=['r1','r2','r3'];
+  document.getElementById('lb-body').innerHTML=active.map(([id,v],i)=>{
+    const isMe=id===CU?.id;
+    const rank=i<3?`<span class="lb-rank ${rc[i]}">${med[i]}</span>`:`<span class="lb-rank">${i+1}</span>`;
+    return `<div class="lb-row${isMe?' me':''}">
+      ${rank}
+      <div>
+        <div class="lb-name">${v.name}${isMe?' <span style="font-size:10px;background:var(--red-l);color:var(--red);padding:2px 7px;border-radius:10px">You</span>':''}</div>
+        <div class="lb-sub">${v.acts} activit${v.acts===1?'y':'ies'} completed</div>
+      </div>
+      <div class="lb-score">${v.score} pts</div>
+      <div class="lb-acts">${v.acts} done</div>
+    </div>`;
+  }).join('');
+  document.getElementById('lb-ts').textContent='Updated '+new Date().toLocaleTimeString();
+}
+
+/* ══ USERS ══ */
+function refreshUsers(){
+  const u=getU(), sc=getSc(), now=Date.now();
+  const online=Object.entries(u).filter(([,v])=>now-v.ts<3*60*1000);
+  const recent=Object.entries(u).filter(([,v])=>now-v.ts>=3*60*1000&&now-v.ts<30*60*1000);
+  const all=[...online.map(([id,v])=>({...v,id,on:true})),...recent.map(([id,v])=>({...v,id,on:false}))];
+  if(all.length===0){document.getElementById('users-grid').innerHTML='<div style="font-size:13px;color:var(--ink3);grid-column:1/-1">No other users yet. Share the link to invite classmates!</div>';return;}
+  document.getElementById('users-grid').innerHTML=all.map(u=>{
+    const pts=sc[u.id]?.score||0;
+    return `<div class="u-card${u.on?' online':''}">
+      <div class="u-av" style="background:${sColor(u.name)}">${u.initials||u.name[0]?.toUpperCase()||'?'}</div>
+      <div class="u-name">${u.name}${u.id===CU?.id?' (you)':''}</div>
+      <div class="u-status"><span class="u-dot${u.on?' on':''}"></span>${u.on?'Online':'Recent'}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--red);margin-top:2px">${pts} pts</div>
+    </div>`;
+  }).join('');
+}
+function sColor(s){if(!s)return'#C8102E';let h=0;for(let i=0;i<s.length;i++)h=s.charCodeAt(i)+((h<<5)-h);return['#C8102E','#1555A0','#0D6B53','#4E44B5','#7a5c00','#9B0B22'][Math.abs(h)%6];}
+
+/* ══ RENDER PROMPTS ══ */
+const ACT_COLORS={'a1':'plog-a1','a2':'plog-a2','a3':'plog-a3','a4':'plog-a4','a5':'plog-a5','a6':'plog-a6','a7':'plog-a7'};
+const ACT_BADGE_COLORS={'a1':'badge-a1','a2':'badge-a2','a3':'badge-a3','a4':'badge-a4','a5':'badge-a5','a6':'badge-a6','a7':'badge-a7'};
+const ACT_SHORT={'a1':'Act 1','a2':'Act 2','a3':'Act 3','a4':'Act 4','a5':'Act 5','a6':'Act 6','a7':'Act 7'};
+
+function renderPrompts(){
+  const actFilter=document.getElementById('plog-act-filter').value;
+  const search=document.getElementById('plog-search').value.trim().toLowerCase();
+  let all=getPrompts().sort((a,b)=>b.ts-a.ts);
+
+  if(actFilter) all=all.filter(p=>p.activityId&&p.activityId.startsWith(actFilter));
+  if(search) all=all.filter(p=>
+    (p.name||'').toLowerCase().includes(search)||
+    (p.firstName||'').toLowerCase().includes(search)||
+    (p.studentId||'').toLowerCase().includes(search)||
+    (p.prompt||'').toLowerCase().includes(search)
+  );
+
+  const count=document.getElementById('plog-count');
+  const list=document.getElementById('plog-list');
+  count.innerHTML=`Showing <strong>${all.length}</strong> prompt${all.length!==1?'s':''} ${actFilter?'for this activity':'across all activities'}`;
+
+  if(all.length===0){
+    list.innerHTML='<div class="plog-empty">No prompts submitted yet. Students will appear here as they complete activities.</div>';
+    return;
+  }
+
+  list.innerHTML=all.map(p=>{
+    const actId=p.activityId||'';
+    const baseId=actId.replace(/[^a-z0-9]/gi,'').substr(0,2);
+    const colorClass=ACT_COLORS[baseId]||'plog-a1';
+    const badgeClass=ACT_BADGE_COLORS[baseId]||'badge-a1';
+    const ini=(p.firstName||p.name||'?').substr(0,2).toUpperCase();
+    const timeStr=p.ts?new Date(p.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+    const dateStr=p.ts?new Date(p.ts).toLocaleDateString([],{day:'numeric',month:'short'}):'';
+    return `<div class="plog-entry">
+      <div class="plog-header">
+        <div class="plog-student">
+          <div class="plog-av ${colorClass}">${ini}</div>
+          <div>
+            <div class="plog-name">${p.firstName||p.name||'Student'}</div>
+            <div class="plog-id">ID: ${p.studentId||'—'}</div>
+          </div>
+        </div>
+        <div class="plog-meta">
+          <span class="plog-act-badge ${badgeClass}">${p.activityTitle||actId||'Activity'}</span>
+          <span class="plog-time">${dateStr} ${timeStr}</span>
+        </div>
+      </div>
+      <div class="plog-prompt">${escapeHtml(p.prompt||'')}</div>
+    </div>`;
+  }).join('');
+}
+
+function escapeHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function clearAllPrompts(){
+  if(!confirm('Clear all saved prompts? This cannot be undone.'))return;
+  localStorage.removeItem(SK('prompts'));
+  renderPrompts();
+  showToast('All prompts cleared.');
+}
+
+/* ══ TOAST ══ */
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+/* ══ INIT ══ */
+document.getElementById('l-name').focus();
+</script>
+</body>
+</html>

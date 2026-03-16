@@ -49,6 +49,22 @@ export interface SubmissionAttempt {
   submitted_at: string;
 }
 
+export interface StudentPromptEntry {
+  student_name: string;
+  task_id: string;
+  task_name: string;
+  prompt: string;
+  score: number;
+  submitted_at: string;
+}
+
+export interface GetStudentPromptsParams {
+  taskId?: string;
+  student?: string;
+  limit?: number;
+  offset?: number;
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json" },
@@ -85,4 +101,14 @@ export const api = {
     apiFetch<SubmissionAttempt[]>(
       `/api/tasks/${taskId}/history?student=${encodeURIComponent(studentName)}`
     ),
+
+  getStudentPrompts: (params: GetStudentPromptsParams = {}) => {
+    const sp = new URLSearchParams();
+    if (params.taskId) sp.set("task_id", params.taskId);
+    if (params.student) sp.set("student", params.student);
+    if (params.limit != null) sp.set("limit", String(params.limit));
+    if (params.offset != null) sp.set("offset", String(params.offset));
+    const q = sp.toString();
+    return apiFetch<StudentPromptEntry[]>(`/api/student-prompts${q ? `?${q}` : ""}`);
+  },
 };

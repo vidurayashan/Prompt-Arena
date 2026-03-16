@@ -103,3 +103,39 @@ def get_student_best(student_name: str, task_id: str) -> int | None:
         return row[0] if row and row[0] is not None else None
     finally:
         con.close()
+
+
+def get_student_prompts(
+    task_id: str | None = None,
+    student_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict[str, Any]]:
+    """Return submissions that have a non-empty prompt, for the Student Prompts tab."""
+    con = _conn()
+    try:
+        conditions = ["prompt IS NOT NULL", "trim(prompt) <> ''"]
+        params: list[Any] = []
+        if task_id:
+            conditions.append("task_id = %s")
+            params.append(task_id)
+        if student_filter:
+            conditions.append("student_name ILIKE %s")
+            params.append(f"%{student_filter}%")
+        where_sql = " AND ".join(conditions)
+        params.extend([limit, offset])
+        with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                SELECT student_name, task_id, prompt, score, submitted_at
+                FROM   scores
+                WHERE  {where_sql}
+                ORDER  BY submitted_at DESC
+                LIMIT  %s OFFSET %s
+                """,
+                params,
+            )
+            rows = cur.fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        con.close()

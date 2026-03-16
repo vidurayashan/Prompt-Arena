@@ -82,6 +82,13 @@ export default function TaskDetailPage() {
       const res = await api.submitPrompt(taskId, studentName, prompt.trim());
       setResult(res);
       setStage("done");
+      if (res.is_new_best && taskId) {
+        try {
+          const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
+          stored[taskId] = res.total;
+          localStorage.setItem("taskBests", JSON.stringify(stored));
+        } catch { /* ignore */ }
+      }
       refreshSideData();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err: unknown) {

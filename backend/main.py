@@ -269,6 +269,35 @@ def get_history(
     return leaderboard.get_student_history(student, task_id)
 
 
+@app.get("/api/student-prompts")
+def get_student_prompts(
+    task_id: str | None = Query(None, description="Filter by task ID"),
+    student: str | None = Query(None, description="Filter by student name (substring)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> list[dict[str, Any]]:
+    """List submitted prompts for the Student Prompts tab. Optional filters: task_id, student."""
+    rows = leaderboard.get_student_prompts(
+        task_id=task_id,
+        student_filter=student or None,
+        limit=limit,
+        offset=offset,
+    )
+    result = []
+    for row in rows:
+        task = config_loader.get_task(row["task_id"])
+        task_name = task["name"] if task else row["task_id"]
+        result.append({
+            "student_name": row["student_name"],
+            "task_id": row["task_id"],
+            "task_name": task_name,
+            "prompt": row["prompt"],
+            "score": row["score"],
+            "submitted_at": row["submitted_at"].isoformat() if hasattr(row["submitted_at"], "isoformat") else str(row["submitted_at"]),
+        })
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Serve built React frontend (production)
 # ---------------------------------------------------------------------------
