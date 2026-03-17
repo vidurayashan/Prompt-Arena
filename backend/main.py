@@ -55,6 +55,22 @@ class SubmitRequest(BaseModel):
     prompt: str
 
 
+class ChatMessage(BaseModel):
+    role: str  # "student" or "assistant"
+    content: str
+
+
+class ChatTurnRequest(BaseModel):
+    student_name: str
+    message: str
+    history: list[ChatMessage]
+
+
+class ChatScoreRequest(BaseModel):
+    student_name: str
+    history: list[ChatMessage]
+
+
 class ScoreItem(BaseModel):
     item_id: int
     label: str
@@ -64,12 +80,19 @@ class ScoreItem(BaseModel):
     reason: str
 
 
+class JudgeBreakdownItem(BaseModel):
+    score: int
+    max: int
+
+
 class SubmitResponse(BaseModel):
     student_output: str
     scores: list[ScoreItem]
     total: int
     previous_best: int | None
     is_new_best: bool
+    judge_breakdown: dict[str, JudgeBreakdownItem] | None = None
+    judge_feedback: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -88,18 +111,40 @@ def _public_task(task: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
     """Strip answers and add model info before sending to the frontend."""
     global_persona = cfg.get("judge_persona", "strict")
     task_persona = task.get("judge_persona", global_persona)
-    return {
+    base: dict[str, Any] = {
         "id": task["id"],
         "name": task["name"],
+        "task_type": task.get("task_type", "Document"),
         "description": task["description"],
-        "document_filename": Path(task["document"]).name,
         "task_model": cfg["task_model"],
         "judge_persona": task_persona,
-        "items": [
+    }
+    # Optional per-task instructions and prompt configuration
+    if "instructions" in task:
+        base["instructions"] = task["instructions"]
+    # Optional per-task prompt configuration for Prompt/Document tasks
+    for key in ("prompt_intro", "prompt_panel_title", "prompt_panel_body", "prompt_placeholder"):
+        if key in task:
+            base[key] = task[key]
+
+    task_type = base["task_type"]
+
+    if task_type == "Document":
+        base["document_filename"] = Path(task["document"]).name
+        base["items"] = [
             {"id": item["id"], "label": item["label"]}
             for item in task["items"]
-        ],
-    }
+        ]
+    elif task_type == "Prompt":
+        if "judge_prompt" in task:
+            base["judge_prompt"] = task["judge_prompt"]
+        if "evaluate_what" in task:
+            base["evaluate_what"] = task["evaluate_what"]
+    elif task_type == "Chat":
+        if "judge_prompt" in task:
+            base["judge_prompt"] = task["judge_prompt"]
+
+    return base
 
 
 # ---------------------------------------------------------------------------
@@ -123,6 +168,7 @@ def list_tasks() -> list[dict[str, Any]]:
             "id": t["id"],
             "name": t["name"],
             "description": t["description"],
+            "instructions": t.get("instructions"),
         }
         for t in cfg.get("tasks", [])
     ]
@@ -138,6 +184,8 @@ def get_task(task_id: str) -> dict[str, Any]:
 @app.get("/api/tasks/{task_id}/document")
 def download_document(task_id: str) -> FileResponse:
     task = _safe_task(task_id)
+    if task.get("task_type", "Document") != "Document":
+        raise HTTPException(status_code=400, detail="This task type does not have a document")
     doc_path = config_loader.get_document_path(task)
     if not doc_path.exists():
         raise HTTPException(status_code=404, detail="Document file not found on server")
@@ -177,73 +225,134 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
             detail="No API key configured for the judge model. Set OPENAI_API_KEY or OPENROUTER_API_KEY in .env.",
         )
 
-    # 1. Extract PDF text
-    doc_path = config_loader.get_document_path(task)
-    try:
-        doc_text = pdf_utils.extract_text(doc_path)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Task document not found on server")
+    task_type = task.get("task_type", "Document")
+    judge_breakdown = None
+    judge_feedback = None
 
-    # 2. Run the student's prompt through the task LLM
-    try:
-        student_output = llm_client.run_task_prompt(
-            api_key=task_key,
-            model=cfg["task_model"],
-            student_prompt=body.prompt,
-            document_text=doc_text,
-            base_url=task_base_url,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Task LLM error: {exc}")
+    if task_type == "Document":
+        # 1. Extract PDF text
+        doc_path = config_loader.get_document_path(task)
+        try:
+            doc_text = pdf_utils.extract_text(doc_path)
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail="Task document not found on server")
 
-    # 3. Judge the output
-    items = task["items"]
-    correct_answers = [item["answer"] for item in items]
-    global_persona = cfg.get("judge_persona", "strict")
-    task_persona = task.get("judge_persona", global_persona)
-    try:
-        judgment = llm_client.run_judge(
-            api_key=judge_key,
-            judge_model=cfg["judge_model"],
-            items=items,
-            correct_answers=correct_answers,
-            student_output=student_output,
-            base_url=judge_base_url,
-            persona=task_persona,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
+        # 2. Run the student's prompt through the task LLM
+        try:
+            student_output = llm_client.run_task_prompt(
+                api_key=task_key,
+                model=cfg["task_model"],
+                student_prompt=body.prompt,
+                document_text=doc_text,
+                base_url=task_base_url,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Task LLM error: {exc}")
 
-    # Compute total server-side from individual scores — never trust the judge's arithmetic
-    raw_scores = judgment.get("scores", [])
-    if raw_scores:
-        total_score: int = round(
-            sum(max(0, min(10, int(s.get("score", 0)))) for s in raw_scores)
-            / (10 * len(raw_scores))
-            * 100
-        )
+        # 3. Judge the output
+        items = task["items"]
+        correct_answers = [item["answer"] for item in items]
+        global_persona = cfg.get("judge_persona", "strict")
+        task_persona = task.get("judge_persona", global_persona)
+        judge_temperature = cfg.get("judge_temperature")
+        try:
+            judgment = llm_client.run_judge(
+                api_key=judge_key,
+                judge_model=cfg["judge_model"],
+                items=items,
+                correct_answers=correct_answers,
+                student_output=student_output,
+                base_url=judge_base_url,
+                persona=task_persona,
+                temperature=judge_temperature,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
+
+        # Compute total server-side from individual scores — never trust the judge's arithmetic
+        raw_scores = judgment.get("scores", [])
+        if raw_scores:
+            total_score: int = round(
+                sum(max(0, min(10, int(s.get("score", 0)))) for s in raw_scores)
+                / (10 * len(raw_scores))
+                * 100
+            )
+        else:
+            total_score = 0
+
+        scores_payload = raw_scores
+
+    elif task_type == "Prompt":
+        judge_prompt = task.get("judge_prompt")
+        evaluate_what = task.get("evaluate_what", "prompt")
+        if not judge_prompt:
+            raise HTTPException(status_code=500, detail="Prompt tasks must define judge_prompt in config.yaml")
+
+        # Always run the student's prompt through the task LLM so we can
+        # show a model answer in the frontend, regardless of what is judged.
+        try:
+            model_output = llm_client.run_freeform_prompt(
+                api_key=task_key,
+                model=cfg["task_model"],
+                student_prompt=body.prompt,
+                base_url=task_base_url,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Task LLM error: {exc}")
+
+        # Decide what text the judge should evaluate
+        if evaluate_what == "output":
+            text_to_judge = model_output
+        else:
+            text_to_judge = body.prompt
+
+        judge_temperature = cfg.get("judge_temperature")
+        try:
+            judgment_simple = llm_client.run_prompt_judge(
+                api_key=judge_key,
+                judge_model=cfg["judge_model"],
+                judge_prompt=judge_prompt,
+                text_to_judge=text_to_judge,
+                base_url=judge_base_url,
+                temperature=judge_temperature,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
+
+        total_score = int(judgment_simple.get("total", 0))
+        total_score = max(0, min(100, total_score))
+        # Frontend should see the model's answer in the Model output box.
+        student_output = model_output
+        judge_breakdown = judgment_simple.get("breakdown")
+        judge_feedback = judgment_simple.get("feedback")
+        scores_payload = []
+
     else:
-        total_score = 0
+        raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
 
-    # 4. Persist score
+    # Persist score
     previous_best = leaderboard.get_student_best(body.student_name, task_id)
     leaderboard.upsert_score(body.student_name, task_id, total_score, body.prompt)
     is_new_best = previous_best is None or total_score > previous_best
 
-    # 5. Build per-item response (merge labels and answers back in)
-    label_map = {item["id"]: item["label"] for item in items}
-    answer_map = {item["id"]: item["answer"] for item in items}
-    score_items = [
-        ScoreItem(
-            item_id=s["item_id"],
-            label=label_map.get(s["item_id"], f"Item {s['item_id']}"),
-            score=s["score"],
-            correct_answer=answer_map.get(s["item_id"], ""),
-            found=s.get("found", ""),
-            reason=s["reason"],
-        )
-        for s in judgment.get("scores", [])
-    ]
+    # 5. Build per-item response (merge labels and answers back in, Document tasks only)
+    if task_type == "Document":
+        items = task["items"]
+        label_map = {item["id"]: item["label"] for item in items}
+        answer_map = {item["id"]: item["answer"] for item in items}
+        score_items = [
+            ScoreItem(
+                item_id=s["item_id"],
+                label=label_map.get(s["item_id"], f"Item {s['item_id']}"),
+                score=s["score"],
+                correct_answer=answer_map.get(s["item_id"], ""),
+                found=s.get("found", ""),
+                reason=s["reason"],
+            )
+            for s in scores_payload
+        ]
+    else:
+        score_items = []
 
     return SubmitResponse(
         student_output=student_output,
@@ -251,6 +360,8 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         total=total_score,
         previous_best=previous_best,
         is_new_best=is_new_best,
+        judge_breakdown=judge_breakdown if isinstance(judge_breakdown, dict) else None,
+        judge_feedback=judge_feedback if isinstance(judge_feedback, str) else None,
     )
 
 
@@ -267,6 +378,129 @@ def get_history(
 ) -> list[dict[str, Any]]:
     _safe_task(task_id)
     return leaderboard.get_student_history(student, task_id)
+
+
+@app.get("/api/student-prompts")
+def get_student_prompts(
+    task_id: str | None = Query(None, description="Filter by task ID"),
+    student: str | None = Query(None, description="Filter by student name (substring)"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> list[dict[str, Any]]:
+    """List submitted prompts for the Student Prompts tab. Optional filters: task_id, student."""
+    rows = leaderboard.get_student_prompts(
+        task_id=task_id,
+        student_filter=student or None,
+        limit=limit,
+        offset=offset,
+    )
+    result = []
+    for row in rows:
+        task = config_loader.get_task(row["task_id"])
+        task_name = task["name"] if task else row["task_id"]
+        result.append({
+            "student_name": row["student_name"],
+            "task_id": row["task_id"],
+            "task_name": task_name,
+            "prompt": row["prompt"],
+            "score": row["score"],
+            "submitted_at": row["submitted_at"].isoformat() if hasattr(row["submitted_at"], "isoformat") else str(row["submitted_at"]),
+        })
+    return result
+
+
+@app.post("/api/tasks/{task_id}/chat/message")
+def chat_message(task_id: str, body: ChatTurnRequest) -> dict[str, str]:
+    cfg = config_loader.get_config()
+    task = _safe_task(task_id)
+
+    if task.get("task_type") != "Chat":
+        raise HTTPException(status_code=400, detail="This endpoint is only for Chat tasks")
+
+    openai_key     = cfg.get("openai_api_key", "")
+    openrouter_key = cfg.get("openrouter_api_key", "")
+    task_base_url  = cfg.get("task_provider_base_url", "") or None
+    task_key       = openrouter_key if task_base_url else openai_key
+    if not task_key:
+        raise HTTPException(status_code=500, detail="No API key configured for the task model.")
+
+    system_msg = (
+        "You are a helpful assistant in a teaching workshop. "
+        "Have a clear, helpful conversation with the student. "
+        "Do not mention that you are being graded."
+    )
+
+    history_messages: list[dict[str, str]] = [{"role": "system", "content": system_msg}]
+    for msg in body.history:
+        role = "user" if msg.role == "student" else "assistant"
+        history_messages.append({"role": role, "content": msg.content})
+    history_messages.append({"role": "user", "content": body.message})
+
+    try:
+        assistant_reply = llm_client.run_chat_turn(
+            api_key=task_key,
+            model=cfg["task_model"],
+            messages=history_messages,
+            base_url=task_base_url,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Chat LLM error: {exc}")
+
+    return {"assistant_message": assistant_reply}
+
+
+@app.post("/api/tasks/{task_id}/chat/score", response_model=SubmitResponse)
+def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
+    cfg = config_loader.get_config()
+    task = _safe_task(task_id)
+
+    if task.get("task_type") != "Chat":
+        raise HTTPException(status_code=400, detail="This endpoint is only for Chat tasks")
+
+    openai_key     = cfg.get("openai_api_key", "")
+    openrouter_key = cfg.get("openrouter_api_key", "")
+    judge_base_url = cfg.get("judge_provider_base_url", "") or None
+    judge_key      = openrouter_key if judge_base_url else openai_key
+    if not judge_key:
+        raise HTTPException(status_code=500, detail="No API key configured for the judge model.")
+
+    judge_prompt = task.get("judge_prompt")
+    if not judge_prompt:
+        raise HTTPException(status_code=500, detail="Chat tasks must define judge_prompt in config.yaml")
+
+    # Flatten chat history into a single transcript string
+    lines: list[str] = []
+    for msg in body.history:
+        speaker = "STUDENT" if msg.role == "student" else "ASSISTANT"
+        lines.append(f"{speaker}: {msg.content}")
+    transcript = "\n".join(lines)
+
+    try:
+        judgment_simple = llm_client.run_prompt_judge(
+            api_key=judge_key,
+            judge_model=cfg["judge_model"],
+            judge_prompt=judge_prompt,
+            text_to_judge=transcript,
+            base_url=judge_base_url,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
+
+    total_score = int(judgment_simple.get("total", 0))
+    total_score = max(0, min(100, total_score))
+
+    # Persist using the transcript as the stored "prompt"
+    previous_best = leaderboard.get_student_best(body.student_name, task_id)
+    leaderboard.upsert_score(body.student_name, task_id, total_score, transcript)
+    is_new_best = previous_best is None or total_score > previous_best
+
+    return SubmitResponse(
+        student_output=transcript,
+        scores=[],
+        total=total_score,
+        previous_best=previous_best,
+        is_new_best=is_new_best,
+    )
 
 
 # ---------------------------------------------------------------------------

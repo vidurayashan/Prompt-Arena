@@ -4,6 +4,7 @@ export interface Task {
   id: string;
   name: string;
   description: string;
+  instructions?: { verb: string; text: string }[];
 }
 
 export interface TaskItem {
@@ -12,10 +13,22 @@ export interface TaskItem {
 }
 
 export interface TaskDetail extends Task {
-  document_filename: string;
+  task_type: "Document" | "Prompt" | "Chat";
+  document_filename?: string;
   task_model: string;
   judge_persona: string;
-  items: TaskItem[];
+  items?: TaskItem[];
+  judge_prompt?: string;
+  evaluate_what?: "prompt" | "output";
+  prompt_intro?: string;
+  prompt_panel_title?: string;
+  prompt_panel_body?: string;
+  prompt_placeholder?: string;
+}
+
+export interface ChatMessage {
+  role: "student" | "assistant";
+  content: string;
 }
 
 export interface ScoreItem {
@@ -33,6 +46,8 @@ export interface SubmitResponse {
   total: number;
   previous_best: number | null;
   is_new_best: boolean;
+  judge_breakdown?: Record<string, { score: number; max: number }> | null;
+  judge_feedback?: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -47,6 +62,22 @@ export interface SubmissionAttempt {
   score: number;
   prompt: string;
   submitted_at: string;
+}
+
+export interface StudentPromptEntry {
+  student_name: string;
+  task_id: string;
+  task_name: string;
+  prompt: string;
+  score: number;
+  submitted_at: string;
+}
+
+export interface GetStudentPromptsParams {
+  taskId?: string;
+  student?: string;
+  limit?: number;
+  offset?: number;
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -78,6 +109,18 @@ export const api = {
       body: JSON.stringify({ student_name: studentName, prompt }),
     }),
 
+  chatSendMessage: (taskId: string, studentName: string, message: string, history: ChatMessage[]) =>
+    apiFetch<{ assistant_message: string }>(`/api/tasks/${taskId}/chat/message`, {
+      method: "POST",
+      body: JSON.stringify({ student_name: studentName, message, history }),
+    }),
+
+  chatScore: (taskId: string, studentName: string, history: ChatMessage[]) =>
+    apiFetch<SubmitResponse>(`/api/tasks/${taskId}/chat/score`, {
+      method: "POST",
+      body: JSON.stringify({ student_name: studentName, history }),
+    }),
+
   getLeaderboard: (taskId: string) =>
     apiFetch<LeaderboardEntry[]>(`/api/tasks/${taskId}/leaderboard`),
 
@@ -85,4 +128,14 @@ export const api = {
     apiFetch<SubmissionAttempt[]>(
       `/api/tasks/${taskId}/history?student=${encodeURIComponent(studentName)}`
     ),
+
+  getStudentPrompts: (params: GetStudentPromptsParams = {}) => {
+    const sp = new URLSearchParams();
+    if (params.taskId) sp.set("task_id", params.taskId);
+    if (params.student) sp.set("student", params.student);
+    if (params.limit != null) sp.set("limit", String(params.limit));
+    if (params.offset != null) sp.set("offset", String(params.offset));
+    const q = sp.toString();
+    return apiFetch<StudentPromptEntry[]>(`/api/student-prompts${q ? `?${q}` : ""}`);
+  },
 };

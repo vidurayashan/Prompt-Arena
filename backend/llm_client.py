@@ -51,6 +51,44 @@ def run_task_prompt(
     return response.choices[0].message.content or ""
 
 
+def run_freeform_prompt(
+    api_key: str,
+    model: str,
+    student_prompt: str,
+    base_url: str | None = None,
+) -> str:
+    """Run a freeform student prompt with no attached document context."""
+    client = _client(api_key, base_url)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": student_prompt}],
+    )
+    return response.choices[0].message.content or ""
+
+
+# ---------------------------------------------------------------------------
+# Chat LLM: multi-turn assistant for Chat tasks
+# ---------------------------------------------------------------------------
+
+
+def run_chat_turn(
+    api_key: str,
+    model: str,
+    messages: list[dict[str, str]],
+    base_url: str | None = None,
+) -> str:
+    """Run a multi-turn chat and return the assistant's latest reply.
+
+    messages: list of {"role": "system" | "user" | "assistant", "content": str}
+    """
+    client = _client(api_key, base_url)
+    response = client.chat.completions.create(
+        model=model,
+        messages=messages,
+    )
+    return response.choices[0].message.content or ""
+
+
 # ---------------------------------------------------------------------------
 # Judge LLM: score the student's output against correct answers
 # ---------------------------------------------------------------------------
@@ -223,6 +261,7 @@ def run_judge(
     student_output: str,
     base_url: str | None = None,
     persona: str = "strict",
+    temperature: float | None = None,
 ) -> dict[str, Any]:
     """Return a scoring dict with per-item scores and a total 0-100.
 
@@ -243,13 +282,17 @@ def run_judge(
         f"STUDENT OUTPUT:\n{student_output}"
     )
 
-    response = client.chat.completions.create(
-        model=judge_model,
-        messages=[
+    kwargs: dict[str, Any] = {
+        "model": judge_model,
+        "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_msg},
         ],
-    )
+    }
+    if temperature is not None:
+        kwargs["temperature"] = float(temperature)
+
+    response = client.chat.completions.create(**kwargs)
 
     raw = response.choices[0].message.content or "{}"
 
@@ -269,3 +312,75 @@ def run_judge(
         }
 
     return result
+
+
+def run_prompt_judge(
+    api_key: str,
+    judge_model: str,
+    judge_prompt: str,
+    text_to_judge: str,
+    base_url: str | None = None,
+    temperature: float | None = None,
+) -> dict[str, Any]:
+    """Use the judge LLM to score text_to_judge with a structured response.
+
+    Returns:
+      {
+        "total": <int 0-100>,
+        "breakdown": { "<criterion>": <int>, ... },
+        "feedback": <str>
+      }
+    """
+    client = _client(api_key, base_url)
+
+    kwargs: dict[str, Any] = {
+        "model": judge_model,
+        "messages": [
+            {"role": "system", "content": judge_prompt},
+            {
+                "role": "user",
+                "content": (
+                    "Here is the text to evaluate. Follow your rubric and "
+                    'respond ONLY with a JSON object like {"total": <int 0-100>, "breakdown": {"Criterion": {"score": <int>, "max": <int>}, ...}, "feedback": "<2-3 sentences>"}.\n'
+                    'If your rubric uses a different maximum score (e.g. X/20), convert it to 0–100 for "total".\n\n'
+                    "=== TEXT START ===\n"
+                    f"{text_to_judge}\n"
+                    "=== TEXT END ==="
+                ),
+            },
+        ],
+    }
+    if temperature is not None:
+        kwargs["temperature"] = float(temperature)
+
+    response = client.chat.completions.create(**kwargs)
+
+    raw = response.choices[0].message.content or "{}"
+    raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("```").strip()
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        data = {}
+
+    total = data.get("total")
+    if not isinstance(total, int):
+        total = 0
+
+    breakdown = data.get("breakdown")
+    if not isinstance(breakdown, dict):
+        breakdown = {}
+
+    normalized_breakdown: dict[str, dict[str, int]] = {}
+    for k, v in breakdown.items():
+        if isinstance(v, dict):
+            score = v.get("score")
+            max_score = v.get("max")
+            if isinstance(score, int) and isinstance(max_score, int) and max_score > 0:
+                normalized_breakdown[str(k)] = {"score": score, "max": max_score}
+
+    feedback = data.get("feedback")
+    if not isinstance(feedback, str):
+        feedback = ""
+
+    return {"total": total, "breakdown": normalized_breakdown, "feedback": feedback}

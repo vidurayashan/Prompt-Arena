@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
-import type { LeaderboardEntry, SubmissionAttempt, SubmitResponse, TaskDetail } from "../api";
+import type { ChatMessage, LeaderboardEntry, SubmissionAttempt, SubmitResponse, TaskDetail } from "../api";
 import Navbar from "../components/Navbar";
 import ScoreDisplay from "../components/ScoreDisplay";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type Stage = "idle" | "submitting" | "done";
 
@@ -46,6 +48,9 @@ export default function TaskDetailPage() {
   const [expandedAttempts, setExpandedAttempts] = useState<Set<number>>(new Set());
   const [itemsCollapsed, setItemsCollapsed] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
 
   function toggleAttempt(idx: number) {
     setExpandedAttempts((prev) => {
@@ -82,6 +87,13 @@ export default function TaskDetailPage() {
       const res = await api.submitPrompt(taskId, studentName, prompt.trim());
       setResult(res);
       setStage("done");
+      if (res.is_new_best && taskId) {
+        try {
+          const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
+          stored[taskId] = res.total;
+          localStorage.setItem("taskBests", JSON.stringify(stored));
+        } catch { /* ignore */ }
+      }
       refreshSideData();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err: unknown) {
@@ -116,6 +128,9 @@ export default function TaskDetailPage() {
   }
 
   const bestScore = history.length > 0 ? Math.max(...history.map((h) => h.score)) : null;
+  const isDocumentTask = task.task_type === "Document";
+  const isPromptTask = task.task_type === "Prompt";
+  const isChatTask = task.task_type === "Chat";
 
   return (
     <>
@@ -144,87 +159,261 @@ export default function TaskDetailPage() {
         </div>
 
         <h1 style={{ marginBottom: ".5rem" }}>{task.name}</h1>
-        <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem" }}>{task.description}</p>
+        <p style={{ color: "var(--text-muted)", marginBottom: ".5rem" }}>{task.description}</p>
+        {isPromptTask && task.prompt_intro && task.prompt_intro.trim().length > 0 && (
+          <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem", fontSize: ".85rem" }}>
+            {task.prompt_intro}
+          </p>
+        )}
+        {isChatTask && (
+          <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem", fontSize: ".85rem" }}>
+            This is a <strong>Chat</strong> task. Have a multi-turn conversation with the model, then use{" "}
+            <strong>Score this chat</strong> to get feedback on the whole conversation.
+          </p>
+        )}
 
-        {/* Document download */}
-        <div className="card mb-2" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 600, marginBottom: ".2rem" }}>Reference document</div>
-            <div style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>
-              {task.document_filename} — download and read this before writing your prompt
+        {/* Document download (Document tasks only) */}
+        {isDocumentTask && task.document_filename && (
+          <div className="card mb-2" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, marginBottom: ".2rem" }}>Reference document</div>
+              <div style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>
+                {task.document_filename} — download and read this before writing your prompt
+              </div>
+            </div>
+            <a
+              href={`/api/tasks/${task.id}/document`}
+              download={task.document_filename}
+              className="btn btn-outline"
+            >
+              Download PDF
+            </a>
+          </div>
+        )}
+
+        {/* Items to extract (Document tasks only) */}
+        {isDocumentTask && task.items && (
+          <div className="card mb-2">
+            <div
+              style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
+              onClick={() => setItemsCollapsed((c) => !c)}
+            >
+              <h2 style={{ margin: 0 }}>What to extract</h2>
+              <span style={{ color: "var(--text-muted)", fontSize: ".85rem" }}>
+                {itemsCollapsed ? "▶ show" : "▼ hide"}
+              </span>
+            </div>
+            {!itemsCollapsed && (
+              <>
+                <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", marginTop: ".75rem" }}>
+                  Your prompt must instruct the AI to extract all of the following items from the document.
+                </p>
+                <ul className="items-list">
+                  {task.items.map((item) => (
+                    <li key={item.id} className="item-row">
+                      <span className="item-num">{item.id}</span>
+                      <span>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Prompt editor or Chat interface */}
+        {!isChatTask && (
+          <div className="card mb-2">
+            <h2>{task.prompt_panel_title ?? "Write your prompt"}</h2>
+            <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", whiteSpace: "pre-wrap" }}>
+              {task.prompt_panel_body ??
+                "The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output."}
+            </p>
+            <label htmlFor="prompt">Your prompt</label>
+            <textarea
+              id="prompt"
+              className="input"
+              rows={8}
+              placeholder={
+                task.prompt_placeholder ??
+                "e.g. Please extract the following information from the document:\n1. Patient full name\n2. Date of birth\n..."
+              }
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              disabled={stage === "submitting"}
+            />
+
+            {submitError && <div className="error-msg mt-1">{submitError}</div>}
+
+            <div className="flex gap-2 items-center mt-2" style={{ justifyContent: "space-between" }}>
+              <span style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
+                Model: <strong>{task.task_model}</strong>
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                Judge: <strong>{task.judge_persona === "generous" ? "Generous" : "Strict"}</strong>
+              </span>
+              <button
+                className="btn btn-primary"
+                onClick={handleSubmit}
+                disabled={stage === "submitting" || !prompt.trim()}
+              >
+                {stage === "submitting" ? "Running…" : "Submit prompt"}
+              </button>
             </div>
           </div>
-          <a
-            href={`/api/tasks/${task.id}/document`}
-            download={task.document_filename}
-            className="btn btn-outline"
-          >
-            Download PDF
-          </a>
-        </div>
+        )}
 
-        {/* Items to extract */}
-        <div className="card mb-2">
-          <div
-            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", userSelect: "none" }}
-            onClick={() => setItemsCollapsed((c) => !c)}
-          >
-            <h2 style={{ margin: 0 }}>What to extract</h2>
-            <span style={{ color: "var(--text-muted)", fontSize: ".85rem" }}>
-              {itemsCollapsed ? "▶ show" : "▼ hide"}
-            </span>
-          </div>
-          {!itemsCollapsed && (
-            <>
-              <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", marginTop: ".75rem" }}>
-                Your prompt must instruct the AI to extract all of the following items from the document.
-              </p>
-              <ul className="items-list">
-                {task.items.map((item) => (
-                  <li key={item.id} className="item-row">
-                    <span className="item-num">{item.id}</span>
-                    <span>{item.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-
-        {/* Prompt editor */}
-        <div className="card mb-2">
-          <h2>Write your prompt</h2>
-          <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem" }}>
-            The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output.
-          </p>
-          <label htmlFor="prompt">Your prompt</label>
-          <textarea
-            id="prompt"
-            className="input"
-            rows={8}
-            placeholder={"e.g. Please extract the following information from the document:\n1. Patient full name\n2. Date of birth\n..."}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            disabled={stage === "submitting"}
-          />
-
-          {submitError && <div className="error-msg mt-1">{submitError}</div>}
-
-          <div className="flex gap-2 items-center mt-2" style={{ justifyContent: "space-between" }}>
-            <span style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
-              Model: <strong>{task.task_model}</strong>
-              &nbsp;&nbsp;|&nbsp;&nbsp;
-              Judge: <strong>{task.judge_persona === "generous" ? "Generous" : "Strict"}</strong>
-            </span>
-            <button
-              className="btn btn-primary"
-              onClick={handleSubmit}
-              disabled={stage === "submitting" || !prompt.trim()}
+        {isChatTask && (
+          <div className="card mb-2">
+            <h2>Chat</h2>
+            <div
+              style={{
+                border: "1px solid var(--border)",
+                borderRadius: "8px",
+                padding: "0.75rem",
+                marginBottom: "0.75rem",
+                maxHeight: "260px",
+                overflowY: "auto",
+                background: "var(--bg-subtle, #f8f9fa)",
+              }}
             >
-              {stage === "submitting" ? "Running…" : "Submit prompt"}
-            </button>
+              {chatHistory.length === 0 && (
+                <div style={{ color: "var(--text-muted)", fontSize: ".85rem" }}>
+                  Start the conversation by sending your first message.
+                </div>
+              )}
+              {chatHistory.map((m, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    justifyContent: m.role === "student" ? "flex-end" : "flex-start",
+                    marginBottom: "0.35rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      maxWidth: "80%",
+                      padding: "0.4rem 0.6rem",
+                      borderRadius: "8px",
+                      background: m.role === "student" ? "var(--primary-light)" : "white",
+                      border: "1px solid var(--border)",
+                      fontSize: ".9rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: ".7rem",
+                        textTransform: "uppercase",
+                        letterSpacing: ".03em",
+                        color: "var(--text-muted)",
+                        marginBottom: "0.1rem",
+                      }}
+                    >
+                      {m.role === "student" ? "You" : "AI"}
+                    </div>
+                    <div className="chat-md">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {m.content}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <label htmlFor="chat-input">Your message</label>
+            <textarea
+              id="chat-input"
+              className="input"
+              rows={3}
+              placeholder="Type your next question or instruction…"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              disabled={chatSending}
+            />
+            {submitError && <div className="error-msg mt-1">{submitError}</div>}
+            <div className="flex gap-2 items-center mt-2" style={{ justifyContent: "space-between" }}>
+              <span style={{ fontSize: ".8rem", color: "var(--text-muted)" }}>
+                Model: <strong>{task.task_model}</strong>
+                &nbsp;&nbsp;|&nbsp;&nbsp;
+                Judge: <strong>{task.judge_persona === "generous" ? "Generous" : "Strict"}</strong>
+              </span>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-ghost"
+                  type="button"
+                  onClick={() => setChatHistory([])}
+                  disabled={chatSending || chatHistory.length === 0}
+                >
+                  Clear chat
+                </button>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={async () => {
+                    if (!taskId || !chatInput.trim()) return;
+                    setSubmitError("");
+                    const message = chatInput.trim();
+                    setChatInput("");
+                    const nextHistory: ChatMessage[] = [
+                      ...chatHistory,
+                      { role: "student", content: message },
+                    ];
+                    setChatHistory(nextHistory);
+                    setChatSending(true);
+                    try {
+                      const res = await api.chatSendMessage(taskId, studentName, message, nextHistory);
+                      setChatHistory((prev) => [
+                        ...prev,
+                        { role: "assistant", content: res.assistant_message },
+                      ]);
+                    } catch (err: unknown) {
+                      setSubmitError(err instanceof Error ? err.message : "Chat failed.");
+                    } finally {
+                      setChatSending(false);
+                    }
+                  }}
+                  disabled={chatSending || !chatInput.trim()}
+                >
+                  {chatSending ? "Sending…" : "Send"}
+                </button>
+              </div>
+            </div>
+            <div style={{ marginTop: "0.75rem", textAlign: "right" }}>
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={async () => {
+                  if (!taskId || chatHistory.length === 0) return;
+                  setSubmitError("");
+                  setStage("submitting");
+                  setResult(null);
+                  try {
+                    const res = await api.chatScore(taskId, studentName, chatHistory);
+                    setResult(res);
+                    setStage("done");
+                    if (res.is_new_best && taskId) {
+                      try {
+                        const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
+                        stored[taskId] = res.total;
+                        localStorage.setItem("taskBests", JSON.stringify(stored));
+                      } catch {
+                        // ignore
+                      }
+                    }
+                    refreshSideData();
+                    setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                  } catch (err: unknown) {
+                    setSubmitError(err instanceof Error ? err.message : "Scoring failed.");
+                    setStage("idle");
+                  }
+                }}
+                disabled={stage === "submitting" || chatHistory.length === 0}
+              >
+                {stage === "submitting" ? "Scoring chat…" : "Score this chat"}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Submitting spinner */}
         {stage === "submitting" && (

@@ -2,84 +2,104 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 
+function buildDisplayName(firstName: string, studentId: string): string {
+  const fn = firstName.trim();
+  const sid = studentId.trim();
+  if (fn && sid) return `${fn} (${sid})`;
+  return fn || sid;
+}
+
+function buildInitials(firstName: string, studentId: string): string {
+  const fn = firstName.trim();
+  const sid = studentId.trim();
+  const a = fn ? fn[0].toUpperCase() : "";
+  const b = sid ? sid[0].toUpperCase() : "";
+  return (a + b) || "?";
+}
+
 export default function LoginPage() {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const displayName = buildDisplayName(firstName, studentId);
+  const initials = buildInitials(firstName, studentId);
+  const showChip = firstName.trim().length > 0 || studentId.trim().length > 0;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Please enter a name.");
+    if (!firstName.trim()) {
+      setError("Please enter your first name.");
+      return;
+    }
+    if (!studentId.trim()) {
+      setError("Please enter your student ID.");
       return;
     }
     setLoading(true);
     try {
-      await api.login(trimmed);
-      localStorage.setItem("studentName", trimmed);
+      await api.login(displayName);
+      localStorage.setItem("studentName", displayName);
       navigate("/tasks");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed.");
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-        background: "var(--bg)",
-      }}
-    >
-      <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-        <div
-          style={{
-            fontSize: "2.5rem",
-            fontWeight: 800,
-            color: "var(--primary)",
-            letterSpacing: "-1px",
-          }}
-        >
-          Prompt Arena
-        </div>
-        <p style={{ color: "var(--text-muted)", marginTop: ".4rem" }}>
-          Practice prompt engineering with real documents
-        </p>
-      </div>
+    <div className="login-screen">
+      <div className="login-box">
+        <div className="login-logo">LT</div>
+        <h2>AI Workshop</h2>
+        <p>La Trobe University · Prompt Engineering &amp; Document AI<br />Enter your details to join the session.</p>
 
-      <div className="card" style={{ width: "100%", maxWidth: "380px" }}>
-        <h2 style={{ marginBottom: "1.25rem" }}>Enter your name to begin</h2>
-        {error && <div className="error-msg">{error}</div>}
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div>
-            <label htmlFor="name">Your temporary name</label>
+        <form onSubmit={handleSubmit}>
+          <div className="lf">
+            <label htmlFor="firstName">First name</label>
             <input
-              id="name"
-              className="input"
+              id="firstName"
               type="text"
-              placeholder="e.g. Alex, Student42…"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Sarah"
+              maxLength={30}
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
               autoFocus
+              autoComplete="given-name"
+            />
+          </div>
+
+          <div className="lf">
+            <label htmlFor="studentId">Student ID</label>
+            <input
+              id="studentId"
+              type="text"
+              placeholder="e.g. 12345678"
+              maxLength={12}
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
               autoComplete="off"
             />
           </div>
-          <button className="btn btn-primary" type="submit" disabled={loading}>
-            {loading ? "Joining…" : "Start →"}
+
+          <div className={`display-chip${showChip ? " visible" : ""}`}>
+            <div className="dc-av">{initials}</div>
+            <div className="dc-info">
+              <div className="dc-name">{displayName || "—"}</div>
+              <div className="dc-hint">Your display name on the leaderboard</div>
+            </div>
+          </div>
+
+          <button className="login-btn" type="submit" disabled={loading}>
+            {loading ? "Joining…" : "Join Workshop →"}
           </button>
         </form>
-        <p style={{ fontSize: ".78rem", color: "var(--text-muted)", marginTop: "1rem", textAlign: "center" }}>
-          No password required. Your name is used only for the leaderboard.
-        </p>
+
+        <div className="login-err">{error}</div>
       </div>
     </div>
   );

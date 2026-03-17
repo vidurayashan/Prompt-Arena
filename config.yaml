@@ -16,6 +16,10 @@ judge_model: "gpt-4o-mini"
 # Base URL for the judge model provider. Leave empty ("") to use OpenAI.
 judge_provider_base_url: ""
 
+# Temperature for the judge model (0.0 = fully deterministic).
+# If unset or null, the provider default temperature is used.
+judge_temperature: 0.0
+
 # Global judge persona: "strict" or "generous"
 #   strict   - detailed partial-credit rubric; zeros for wrong figures or missing identifiers
 #   generous - full marks for correct core info regardless of phrasing; zeros only for
@@ -27,1163 +31,1412 @@ judge_persona: "strict"
 # Tasks
 # ---------------------------------------------------------------------------
 # Each task needs:
-#   id           - unique slug (no spaces)
-#   name         - display name shown to students
-#   description  - short instructions shown on the task page
-#   document     - path to the PDF file (relative to the project root)
+#   id            - unique slug (no spaces)
+#   name          - display name shown to students
+#   task_type     - "Document", "Prompt", or "Chat"
+#   description   - short instructions shown on the task page
 #   judge_persona - optional: "strict" or "generous" (overrides global judge_persona)
-#   items        - list of information pieces students must extract
-#     id         - integer (used in scoring)
-#     label      - what students see (the thing they need to extract)
-#     answer     - correct answer (NEVER shown to students)
+#
+# For task_type = "Document":
+#   document      - path to the PDF file (relative to the project root)
+#   items         - list of information pieces students must extract
+#     id          - integer (used in scoring)
+#     label       - what students see (the thing they need to extract)
+#     answer      - correct answer (NEVER shown to students)
+#
+# For task_type = "Prompt":
+#   judge_prompt  - LLM prompt used to grade either the student's prompt or the LLM output
+#   evaluate_what - what the judge evaluates: "prompt" (student's prompt text) or "output" (LLM output)
+
+# For task_type = "Chat":
+#   judge_prompt  - LLM prompt used to grade the full chat conversation
+#   (the judge evaluates both student prompts and AI outputs together as one conversation)
 # ---------------------------------------------------------------------------
 tasks:
-  - id: task1
-    name: "Task 1: Patient Medical Report"
+  # - id: task1
+  #   name: "Task 1: Patient Medical Report"
+  #   task_type: "Document"
+  #   description: >
+  #     Below is a patient medical report. Write a prompt that instructs the AI
+  #     to extract the required information from this document as accurately as possible.
+  #   document: "documents/sample_medical_report.pdf"
+  #   items:
+  #     - id: 1
+  #       label: "Patient full name"
+  #       answer: "Emily Carter"
+  #     - id: 2
+  #       label: "Date of birth"
+  #       answer: "14 March 1987"
+  #     - id: 3
+  #       label: "Primary diagnosis"
+  #       answer: "Type 2 Diabetes Mellitus"
+  #     - id: 4
+  #       label: "Attending physician"
+  #       answer: "Dr. James Harrington"
+  #     - id: 5
+  #       label: "Prescribed medication"
+  #       answer: "Metformin 500 mg twice daily"
+
+  # - id: task2
+  #   name: "Task 2: Research Paper Abstract"
+  #   task_type: "Document"
+  #   description: >
+  #     You have been given a research paper abstract. Write a prompt to make the
+  #     AI extract the key information listed below from the abstract.
+  #   document: "documents/sample_abstract.pdf"
+  #   items:
+  #     - id: 1
+  #       label: "Paper title"
+  #       answer: "Deep Learning for Natural Language Processing: A Survey"
+  #     - id: 2
+  #       label: "First author's name"
+  #       answer: "Sarah Mitchell"
+  #     - id: 3
+  #       label: "Year of publication"
+  #       answer: "2023"
+  #     - id: 4
+  #       label: "Main research objective"
+  #       answer: "To survey deep learning techniques applied to NLP tasks"
+  #     - id: 5
+  #       label: "Key finding or conclusion"
+  #       answer: "Transformer-based models consistently outperform classical approaches across all NLP benchmarks"
+
+  # - id: task_insurance_contract
+  #   name: "Task 3: Vantara Insurance Policy Information Extraction"
+  #   task_type: "Document"
+  #   description: >
+  #     Write a prompt to extract the required information from this insurance policy document.
+  #   document: "documents/VantaraInsurancePolicy_VLG2024HCP00847.pdf"
+  #   items:
+
+  #   # IDENTIFICATION & POLICY DETAILS
+  #   - id: 1
+  #     label: "Policy Number"
+  #     answer: "VLG-2024-HCP-00847-AU"
+
+  #   - id: 2
+  #     label: "Policy Type"
+  #     answer: "Combined Health & Residential Property Insurance"
+
+  #   - id: 3
+  #     label: "Issue Date"
+  #     answer: "1 March 2024"
+
+  #   - id: 4
+  #     label: "Effective Date"
+  #     answer: "15 March 2024 (12:01 AM AEDT)"
+
+  #   - id: 5
+  #     label: "Expiry Date"
+  #     answer: "14 March 2025 (11:59 PM AEDT)"
+
+  #   - id: 6
+  #     label: "Policy Term"
+  #     answer: "12 months"
+
+  #   - id: 7
+  #     label: "Certificate No."
+  #     answer: "CERT-VLG-2024-08471"
+
+  #   - id: 8
+  #     label: "Regulatory Body"
+  #     answer: "Australian Prudential Regulation Authority (APRA)"
+
+  #   - id: 9
+  #     label: "AFS Licence Number"
+  #     answer: "293817 (issued by ASIC)"
+
+  #   - id: 10
+  #     label: "Product Disclosure Statement version and date"
+  #     answer: "PDS version 7.2, dated 1 January 2024"
+
+  #   # PARTIES — INSURER
+  #   - id: 11
+  #     label: "Legal Name of Insurer"
+  #     answer: "Vantara Life & General Insurance PLC"
+
+  #   - id: 12
+  #     label: "ABN of Insurer"
+  #     answer: "47 382 910 553"
+
+  #   - id: 13
+  #     label: "ACN of Insurer"
+  #     answer: "382 910 553"
+
+  #   - id: 14
+  #     label: "Registered Office Address of Insurer"
+  #     answer: "Level 24, 333 Collins Street, Melbourne VIC 3000, Australia"
+
+  #   - id: 15
+  #     label: "Phone Number of Insurer"
+  #     answer: "+61 3 9201 4400"
+
+  #   - id: 16
+  #     label: "Email of Insurer"
+  #     answer: "policyservices@vantarainsurance.com.au"
+
+  #   - id: 17
+  #     label: "Entity Type of Insurer"
+  #     answer: "Public Limited Company incorporated in Victoria, Australia"
+
+  #   - id: 18
+  #     label: "Chief Underwriting Officer Name"
+  #     answer: "Ms. Catherine Merriweather"
+
+  #   # PARTIES — NAMED INSURED
+  #   - id: 19
+  #     label: "Full Legal Name of Named Insured"
+  #     answer: "Mr. Harrison James Whitfield"
+
+  #   - id: 20
+  #     label: "Date of Birth of Named Insured"
+  #     answer: "14 September 1981 (Age: 42)"
+
+  #   - id: 21
+  #     label: "Gender of Named Insured"
+  #     answer: "Male"
+
+  #   - id: 22
+  #     label: "Residential Address of Named Insured"
+  #     answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
+
+  #   - id: 23
+  #     label: "Mobile Phone of Named Insured"
+  #     answer: "+61 412 774 502"
+
+  #   - id: 24
+  #     label: "Email of Named Insured"
+  #     answer: "h.whitfield@mailcentre.com.au"
+
+  #   - id: 25
+  #     label: "Occupation of Named Insured"
+  #     answer: "Senior Civil Engineer"
+
+  #   - id: 26
+  #     label: "Employer of Named Insured"
+  #     answer: "Aurelius Infrastructure Group Pty Ltd"
+
+  #   - id: 27
+  #     label: "Smoker Status of Named Insured"
+  #     answer: "Non-smoker (declared)"
+
+  #   # ADDITIONAL INSURED PARTIES
+  #   - id: 28
+  #     label: "Additional Insured 1 — Name, Relationship and Date of Birth"
+  #     answer: "Ms. Priya Kamala Whitfield (Spouse), DOB: 22 April 1984"
+
+  #   - id: 29
+  #     label: "Additional Insured 2 — Name, Relationship and Date of Birth"
+  #     answer: "Master Ethan Lucas Whitfield (Dependent Child), DOB: 3 July 2012"
+
+  #   - id: 30
+  #     label: "Additional Insured 3 — Name, Relationship and Date of Birth"
+  #     answer: "Miss Olivia Rose Whitfield (Dependent Child), DOB: 18 November 2015"
+
+  #   # BROKER / AGENT
+  #   - id: 31
+  #     label: "Broker Company Name and ABN"
+  #     answer: "Clearview Financial Advisory Pty Ltd, ABN 63 142 887 330"
+
+  #   - id: 32
+  #     label: "Broker Contact Person and Title"
+  #     answer: "Mr. Daniel Forsythe (Senior Insurance Adviser)"
+
+  #   - id: 33
+  #     label: "Broker Reference Number"
+  #     answer: "CVF-BKR-2024-3390"
+
+  #   - id: 34
+  #     label: "Broker Remuneration Type"
+  #     answer: "Commission-based (disclosed in FSG dated 10 January 2024)"
+
+  #   # FINANCIAL TERMS
+  #   - id: 35
+  #     label: "Total Annual Premium (incl. GST)"
+  #     answer: "AUD $4,218.00"
+
+  #   - id: 36
+  #     label: "Base Premium (excl. GST)"
+  #     answer: "AUD $3,834.00"
+
+  #   - id: 37
+  #     label: "GST Component"
+  #     answer: "AUD $383.40"
+
+  #   - id: 38
+  #     label: "Monthly Instalment Amount"
+  #     answer: "AUD $351.50"
+
+  #   - id: 39
+  #     label: "First Payment Date"
+  #     answer: "15 March 2024"
+
+  #   - id: 40
+  #     label: "Payment Method and Bank Details"
+  #     answer: "Monthly direct debit; BSB 063-000, Account 1234 5678 (Commonwealth Bank)"
+
+  #   - id: 41
+  #     label: "Grace Period for Late Payment"
+  #     answer: "14 calendar days"
+
+  #   - id: 42
+  #     label: "Annual Pay Discount Rate"
+  #     answer: "3% discount if full annual premium paid upfront"
+
+  #   - id: 43
+  #     label: "No-Claim Discount after 1 year"
+  #     answer: "10%"
+
+  #   - id: 44
+  #     label: "No-Claim Discount after 2 years"
+  #     answer: "15%"
+
+  #   - id: 45
+  #     label: "No-Claim Discount after 3 or more years"
+  #     answer: "20%"
+
+  #   - id: 46
+  #     label: "Health — Hospital Premium (total incl. GST)"
+  #     answer: "AUD $1,562.00"
+
+  #   - id: 47
+  #     label: "Health — Extras Premium (total incl. GST)"
+  #     answer: "AUD $748.00"
+
+  #   - id: 48
+  #     label: "Property — Building Premium (total incl. GST)"
+  #     answer: "AUD $961.40"
+
+  #   - id: 49
+  #     label: "Property — Contents Premium (total incl. GST)"
+  #     answer: "AUD $343.20"
+
+  #   - id: 50
+  #     label: "Public Liability Premium (total incl. GST)"
+  #     answer: "AUD $602.80"
+
+  #   # HEALTH COVERAGE — HOSPITAL
+  #   - id: 51
+  #     label: "Type of Health Cover"
+  #     answer: "Comprehensive Hospital & Extras Health Insurance"
+
+  #   - id: 52
+  #     label: "Private Hospital Room — Benefit and Limit"
+  #     answer: "100% of agreed schedule fee; Unlimited; $250 excess per admission"
+
+  #   - id: 53
+  #     label: "Surgical Procedures — Benefit and Limit"
+  #     answer: "100% of MBS schedule fee; $150,000 limit; $250 excess"
+
+  #   - id: 54
+  #     label: "ICU — Benefit, Limit and Excess"
+  #     answer: "100% of agreed fee; $75,000 limit; Nil excess"
+
+  #   - id: 55
+  #     label: "Obstetrics / Maternity — Benefit, Limit and Waiting Period"
+  #     answer: "100% of MBS schedule fee; $30,000 limit; 12-month waiting period; $250 excess"
+
+  #   - id: 56
+  #     label: "Psychiatric / Mental Health — Days per year and Annual Limit"
+  #     answer: "Up to 35 days/year inpatient; $25,000 annual limit"
+
+  #   - id: 57
+  #     label: "Rehabilitation — Days per year and Annual Limit"
+  #     answer: "Up to 30 days/year; $20,000 annual limit"
+
+  #   - id: 58
+  #     label: "Palliative Care — Benefit and Excess"
+  #     answer: "Covered in full; Unlimited; Nil excess"
+
+  #   - id: 59
+  #     label: "Emergency Ambulance — Benefit and Limit"
+  #     answer: "Covered in full; Unlimited"
+
+  #   - id: 60
+  #     label: "Overseas Emergency — Limit and Condition"
+  #     answer: "$50,000 limit; trips exceeding 90 continuous days excluded"
+
+  #   - id: 61
+  #     label: "Standard Excess per Hospital Admission"
+  #     answer: "$250"
+
+  #   # HEALTH COVERAGE — EXTRAS
+  #   - id: 62
+  #     label: "General Dental — Benefit, Annual Limit and Co-payment"
+  #     answer: "80% of schedule fee; $1,200 annual limit; $15 co-payment"
+
+  #   - id: 63
+  #     label: "Major Dental — Benefit, Annual Limit, Waiting Period and Co-payment"
+  #     answer: "60% of schedule fee; $2,500 annual limit; 12-month waiting period; $30 co-payment"
+
+  #   - id: 64
+  #     label: "Orthodontics — Benefit, Lifetime Limit and Waiting Period"
+  #     answer: "50% of schedule fee; $3,000 lifetime limit; 12-month waiting period"
+
+  #   - id: 65
+  #     label: "Optical — Annual Limit per person"
+  #     answer: "Up to $300 per person per year"
+
+  #   - id: 66
+  #     label: "Physiotherapy — Benefit, Annual Limit and Co-payment"
+  #     answer: "80% of schedule fee; $900 annual limit; $10 co-payment"
+
+  #   - id: 67
+  #     label: "Chiropractic — Benefit, Annual Limit and Co-payment"
+  #     answer: "80% of schedule fee; $600 annual limit; $10 co-payment"
+
+  #   - id: 68
+  #     label: "Psychology / Counselling — Benefit, Annual Limit and Co-payment"
+  #     answer: "80% of schedule fee; $1,500 annual limit; $10 co-payment"
+
+  #   - id: 69
+  #     label: "Podiatry — Benefit and Annual Limit"
+  #     answer: "80% of schedule fee; $500 annual limit"
+
+  #   - id: 70
+  #     label: "Pharmaceuticals (non-PBS) — Benefit and Annual Limit"
+  #     answer: "60% of cost; $800 annual limit; $20 co-payment"
+
+  #   - id: 71
+  #     label: "Hearing Aids — Benefit, Limit, Period and Waiting Period"
+  #     answer: "50% of cost; $2,000 per 3-year period; 36-month waiting period"
+
+  #   # WAITING PERIODS
+  #   - id: 72
+  #     label: "Waiting Period — Accidents and Emergency"
+  #     answer: "None"
+
+  #   - id: 73
+  #     label: "Waiting Period — General Medical and Surgical"
+  #     answer: "2 months"
+
+  #   - id: 74
+  #     label: "Waiting Period — Obstetrics and Maternity"
+  #     answer: "12 months"
+
+  #   - id: 75
+  #     label: "Waiting Period — Major Dental and Orthodontics"
+  #     answer: "12 months"
+
+  #   - id: 76
+  #     label: "Waiting Period — Pre-existing Conditions (Hospital)"
+  #     answer: "12 months"
+
+  #   - id: 77
+  #     label: "Waiting Period — Psychiatric and Rehabilitation"
+  #     answer: "2 months (pre-existing conditions: 12 months)"
+
+  #   - id: 78
+  #     label: "Waiting Period — Hearing Aids"
+  #     answer: "36 months"
+
+  #   - id: 79
+  #     label: "Waiting Period — All Other Extras"
+  #     answer: "2 months"
+
+  #   # PROPERTY — INSURED PREMISES
+  #   - id: 80
+  #     label: "Property Address"
+  #     answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
+
+  #   - id: 81
+  #     label: "Property Type and Tenure"
+  #     answer: "Single-storey residential dwelling on freehold title"
+
+  #   - id: 82
+  #     label: "Year Built"
+  #     answer: "1997"
+
+  #   - id: 83
+  #     label: "Construction Materials"
+  #     answer: "Brick veneer exterior; timber frame; terracotta tile roof"
+
+  #   - id: 84
+  #     label: "Land Area"
+  #     answer: "685 square metres (approx.)"
+
+  #   - id: 85
+  #     label: "Local Council"
+  #     answer: "City of Manningham"
+
+  #   - id: 86
+  #     label: "Title Reference"
+  #     answer: "Volume 9432, Folio 177"
+
+  #   - id: 87
+  #     label: "Bushfire Attack Level (BAL)"
+  #     answer: "BAL-12.5"
+
+  #   # PROPERTY — BUILDING COVER
+  #   - id: 88
+  #     label: "Sum Insured — Building"
+  #     answer: "AUD $850,000 (agreed value, replacement cost basis)"
+
+  #   - id: 89
+  #     label: "Additional Structures — Combined Limit"
+  #     answer: "$50,000 combined (garage, garden shed, fencing, in-ground swimming pool)"
+
+  #   - id: 90
+  #     label: "Debris Removal — Limit as percentage of Sum Insured"
+  #     answer: "Up to 10% of Building Sum Insured"
+
+  #   - id: 91
+  #     label: "Architects and Engineers — Limit as percentage of Sum Insured"
+  #     answer: "Up to 5% of Building Sum Insured"
+
+  #   - id: 92
+  #     label: "Temporary Accommodation — Weekly Rate and Maximum Duration"
+  #     answer: "AUD $1,500/week for up to 52 weeks while uninhabitable"
+
+  #   - id: 93
+  #     label: "Mortgagee Name and Loan Reference Number"
+  #     answer: "Commonwealth Bank of Australia; Loan No. CBA-MTG-0047883"
+
+  #   - id: 94
+  #     label: "Standard Excess — Building"
+  #     answer: "AUD $500"
+
+  #   - id: 95
+  #     label: "Excess for Earthquake and Flood"
+  #     answer: "AUD $1,000"
+
+  #   # PROPERTY — CONTENTS COVER
+  #   - id: 96
+  #     label: "Sum Insured — Contents"
+  #     answer: "AUD $120,000"
+
+  #   - id: 97
+  #     label: "Basis of Settlement"
+  #     answer: "Replacement as new"
+
+  #   - id: 98
+  #     label: "Single Article Limit (unspecified items)"
+  #     answer: "AUD $5,000 per unspecified item"
+
+  #   - id: 99
+  #     label: "Jewellery and Watches — Combined Limit"
+  #     answer: "AUD $10,000 combined"
+
+  #   - id: 100
+  #     label: "Portable Electronics — Combined Limit"
+  #     answer: "AUD $8,000 combined"
+
+  #   - id: 101
+  #     label: "Cash and Negotiable Instruments — Maximum"
+  #     answer: "AUD $500"
+
+  #   - id: 102
+  #     label: "Standard Excess — Contents"
+  #     answer: "AUD $250"
+
+  #   # LIABILITY COVER
+  #   - id: 103
+  #     label: "Liability Sum Insured — per occurrence and aggregate"
+  #     answer: "AUD $20,000,000 per occurrence and in the aggregate"
+
+  #   - id: 104
+  #     label: "Legal Defence Costs — how covered"
+  #     answer: "Covered in addition to the Liability Sum Insured"
+
+  #   # SCHEDULED HIGH-VALUE ITEMS
+  #   - id: 105
+  #     label: "Item B-01 — Description, Value and Certificate Number"
+  #     answer: "Diamond engagement ring (platinum setting); AUD $18,500; CERT-GIA-2009-447812"
+
+  #   - id: 106
+  #     label: "Item B-02 — Description, Value and Serial Number"
+  #     answer: "Omega Seamaster 300m wristwatch; AUD $8,200; S/N 78341092"
+
+  #   - id: 107
+  #     label: "Item B-03 — Description, Value and Serial Number"
+  #     answer: "Sony Alpha A7 IV camera system (body + 3 lenses); AUD $6,800; S/N 3841759-A"
+
+  #   - id: 108
+  #     label: "Item B-04 — Description, Value and Serial Number"
+  #     answer: "Trek Domane SL6 mountain bicycle (2022); AUD $5,400; S/N WTU2209-00213"
+
+  #   - id: 109
+  #     label: "Item B-05 — Description, Value and Provenance Reference"
+  #     answer: "'Autumn on the Yarra' oil painting by D. Renshaw (2018); AUD $4,500; Provenance ref GVG-4412"
+
+  #   - id: 110
+  #     label: "Item B-06 — Description, Value and Serial Number"
+  #     answer: "Apple MacBook Pro 16-inch M3 Max laptop; AUD $4,200; S/N C02ZQ1NDMD6T"
+
+  #   # BENEFICIARIES
+  #   - id: 111
+  #     label: "Primary Beneficiary — Name, Relationship and Share"
+  #     answer: "Ms. Priya Kamala Whitfield (Spouse) — 100% of death benefit"
+
+  #   - id: 112
+  #     label: "Contingent Beneficiary — Names and Condition"
+  #     answer: "Master Ethan Lucas Whitfield and Miss Olivia Rose Whitfield (equally), if primary beneficiary predeceases"
+
+  #   - id: 113
+  #     label: "Estate Fallback — Condition"
+  #     answer: "Payable to the Estate of the Named Insured if no surviving named beneficiary"
+
+  #   # RIDERS & ENDORSEMENTS
+  #   - id: 114
+  #     label: "END-C1 — Benefit Type, Amount, Status and Additional Premium"
+  #     answer: "Accidental Death Benefit; AUD $200,000 lump sum; Active; +AUD $180.00/year"
+
+  #   - id: 115
+  #     label: "END-C2 — Benefit Type, Percentage, Waiting Period, Age Limit, Monthly Cap, Status and Additional Premium"
+  #     answer: "Income Protection; 75% of pre-disability income; 90-day waiting period; to age 65; AUD $12,500 monthly cap; Active; +AUD $420.00/year"
+
+  #   - id: 116
+  #     label: "END-C3 — Benefit Type, Maximum Benefit and Status"
+  #     answer: "Fertility Treatment Benefit; up to AUD $15,000 per couple; Not Selected"
+
+  #   - id: 117
+  #     label: "END-C4 — Benefit Type, Coverage Limit, Status and Additional Premium"
+  #     answer: "Home Office Extension; AUD $10,000 equipment limit; Active; +AUD $95.00/year"
+
+  #   - id: 118
+  #     label: "END-C5 — Benefit Type, Coverage Limit, Status and Additional Premium"
+  #     answer: "Pet Injury Liability; AUD $500,000 per occurrence; Active; +AUD $45.00/year"
+
+  #   - id: 119
+  #     label: "END-C6 — Benefit Type, Excess and Status"
+  #     answer: "Flood Upgrade (full flood cover); AUD $1,000 excess; Not Selected"
+
+  #   - id: 120
+  #     label: "END-C7 — Status and Additional Premium"
+  #     answer: "Scheduled High-Value Items endorsement; Active; +AUD $175.00/year"
+
+  #   # CLAIMS
+  #   - id: 121
+  #     label: "Notification Timeframe — Theft and Burglary"
+  #     answer: "Within 24 hours of discovery; police report must be obtained within 48 hours"
+
+  #   - id: 122
+  #     label: "Notification Timeframe — Property Damage"
+  #     answer: "Within 7 days of the Insured Event"
+
+  #   - id: 123
+  #     label: "Notification Timeframe — Health Claims"
+  #     answer: "Within 60 days of the date of service or discharge from hospital"
+
+  #   - id: 124
+  #     label: "Claims Phone Number"
+  #     answer: "1800 VANTARA (1800 826 827)"
+
+  #   - id: 125
+  #     label: "Claims Email Address"
+  #     answer: "claims@vantarainsurance.com.au"
+
+  #   - id: 126
+  #     label: "Claims Decision Timeframe"
+  #     answer: "10 Business Days (complex property claims: up to 20 Business Days)"
+
+  #   - id: 127
+  #     label: "Settlement Payment Timeframe after Approval"
+  #     answer: "Within 5 Business Days of claim approval"
+
+  #   - id: 128
+  #     label: "Reinstatement Window and Fee"
+  #     answer: "Within 60 days of lapse date; AUD $55 administration fee"
+
+  #   - id: 129
+  #     label: "Cancellation Administration Fee"
+  #     answer: "AUD $75"
+
+  #   - id: 130
+  #     label: "Cooling-off Period Duration and Refund Terms"
+  #     answer: "21 days from date of issue; full premium refund if no claim has been made"
+
+  #   # LEGAL & REGULATORY
+  #   - id: 131
+  #     label: "Governing Law — State and Country"
+  #     answer: "State of Victoria, Australia"
+
+  #   - id: 132
+  #     label: "Key Legislation Referenced"
+  #     answer: "Insurance Contracts Act 1984 (Cth); Insurance Act 1973 (Cth); Privacy Act 1988 (Cth); Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
+
+  #   - id: 133
+  #     label: "External Dispute Resolution Body — Name and Phone Number"
+  #     answer: "Australian Financial Complaints Authority (AFCA); 1800 931 678"
+
+  #   - id: 134
+  #     label: "EDR Time Limit for Referral"
+  #     answer: "Within 2 years of the Insurer's final IDR response"
+
+  #   - id: 135
+  #     label: "IDR Response Timeframe"
+  #     answer: "30 calendar days"
+
+  #   - id: 136
+  #     label: "Renewal Notice Period"
+  #     answer: "Minimum 21 days prior to the Expiry Date"
+
+  #   - id: 137
+  #     label: "Risk Change Notification Timeframe"
+  #     answer: "Within 14 Business Days"
+
+  #   - id: 138
+  #     label: "Cancellation Notice Period by Insurer"
+  #     answer: "Minimum 14 days written notice by registered post or email"
+
+  #   - id: 139
+  #     label: "Witness to Signature — Name and Date"
+  #     answer: "Mr. Samuel Okafor; 1 March 2024"
+
+  # - id: task_meridian_loan_agreement
+  #   name: "Task 4: Meridian Commercial Facility Agreement Information Extraction"
+  #   task_type: "Document"
+  #   description: >
+  #     Write a prompt to extract the required information from this commercial
+  #     facility agreement. Be precise — many facts are buried within long
+  #     paragraphs, and decoy numbers appear near the correct answers.
+  #   document: "documents/MeridianFacilityAgreement_MCB2024CFA00312.pdf"
+  #   judge_persona: "generous"
+  #   items:
+
+  #   # ── AGREEMENT IDENTIFICATION ─────────────────────────────────────────────
+  #   - id: 1
+  #     label: "Agreement Reference Number"
+  #     answer: "MCB-CFA-2024-00312-SYD"
+
+  #   - id: 2
+  #     label: "Credit Committee Approval Reference"
+  #     answer: "MCB-CC-2024-0884 (approved 7 June 2024)"
+
+  #   - id: 3
+  #     label: "Date of Agreement (execution date)"
+  #     answer: "14 June 2024"
+
+  #   - id: 4
+  #     label: "Financial Close Date"
+  #     answer: "1 July 2024"
+
+  #   - id: 5
+  #     label: "Final Maturity Date"
+  #     answer: "30 June 2031"
+
+  #   - id: 6
+  #     label: "Total Facility Tenor"
+  #     answer: "7 years"
+
+  #   - id: 7
+  #     label: "Mandatory Review / Repricing Date"
+  #     answer: "30 June 2028"
+
+  #   - id: 8
+  #     label: "Revolving Credit Facility Availability Period End Date"
+  #     answer: "30 June 2026"
+
+  #   - id: 9
+  #     label: "Borrower's Solicitors — firm name and matter reference"
+  #     answer: "Carrington & Webb Lawyers, reference CWL-MCB-2024-0047"
+
+  #   - id: 10
+  #     label: "Lender's Solicitors — firm name and matter reference"
+  #     answer: "Hallsworth Finch & Partners, reference HFP-MCB-2024-3301"
+
+  #   # ── LENDER DETAILS ────────────────────────────────────────────────────────
+  #   - id: 11
+  #     label: "Lender — Legal Name"
+  #     answer: "Meridian Commercial Bank Limited"
+
+  #   - id: 12
+  #     label: "Lender — ABN"
+  #     answer: "58 204 719 336"
+
+  #   - id: 13
+  #     label: "Lender — ACN"
+  #     answer: "204 719 336"
+
+  #   - id: 14
+  #     label: "Lender — AFSL Number"
+  #     answer: "298841"
+
+  #   - id: 15
+  #     label: "Lender — Australian Credit Licence Number"
+  #     answer: "298841"
+
+  #   - id: 16
+  #     label: "Lender — Registered Office Address"
+  #     answer: "Level 38, 1 Macquarie Place, Sydney NSW 2000, Australia"
+
+  #   - id: 17
+  #     label: "Lender — SWIFT / BIC Code"
+  #     answer: "MCBLAU2SXXX"
+
+  #   - id: 18
+  #     label: "Lender — Corporate Banking Phone"
+  #     answer: "+61 2 9247 8800"
+
+  #   - id: 19
+  #     label: "Lender — Corporate Banking Email"
+  #     answer: "corporatebanking@meridianbank.com.au"
+
+  #   - id: 20
+  #     label: "Lender — Drawdown Notices Email"
+  #     answer: "drawdowns@meridianbank.com.au"
+
+  #   - id: 21
+  #     label: "Lender — Signatory Name and Title"
+  #     answer: "Mr. Jonathan Phillip Quested, Executive Director, Corporate Banking"
+
+  #   - id: 22
+  #     label: "Lender — Second Signatory Name and Title"
+  #     answer: "Ms. Victoria Anne Pemberton, General Counsel & Company Secretary"
+
+  #   # ── BORROWER DETAILS ──────────────────────────────────────────────────────
+  #   - id: 23
+  #     label: "Borrower — Legal Name"
+  #     answer: "Araluen Resources & Exports Pty Ltd"
+
+  #   - id: 24
+  #     label: "Borrower — ACN"
+  #     answer: "144 827 591"
+
+  #   - id: 25
+  #     label: "Borrower — ABN"
+  #     answer: "73 144 827 591"
+
+  #   - id: 26
+  #     label: "Borrower — Date of Incorporation"
+  #     answer: "17 March 2011"
+
+  #   - id: 27
+  #     label: "Borrower — Registered and Trading Address"
+  #     answer: "Suite 901, 88 Pitt Street, Sydney NSW 2000, Australia"
+
+  #   - id: 28
+  #     label: "Borrower — Chief Financial Officer (name and email)"
+  #     answer: "Ms. Rosalind Therese Nakamura; r.nakamura@arex.com.au"
+
+  #   - id: 29
+  #     label: "Borrower — CFO Phone"
+  #     answer: "+61 2 8231 4470"
+
+  #   - id: 30
+  #     label: "Borrower — Managing Director / Authorised Signatory"
+  #     answer: "Mr. Theodore Sebastian Hartmann"
+
+  #   - id: 31
+  #     label: "Borrower — Board Resolution authorising execution"
+  #     answer: "ARE-BR-2024-042 dated 5 June 2024"
+
+  #   - id: 32
+  #     label: "Borrower — Consolidated Audited Revenue (FY2023)"
+  #     answer: "AUD $312,800,000"
+
+  #   - id: 33
+  #     label: "Borrower — EBITDA (FY2023)"
+  #     answer: "AUD $71,400,000"
+
+  #   - id: 34
+  #     label: "Borrower — Net Profit After Tax (FY2023)"
+  #     answer: "AUD $38,200,000"
+
+  #   # ── GUARANTORS ────────────────────────────────────────────────────────────
+  #   - id: 35
+  #     label: "Guarantor 1 — Name, ACN and guarantee limit"
+  #     answer: "Hartmann Family Holdings Pty Ltd, ACN 098 334 712; guarantee limited to AUD $25,000,000"
+
+  #   - id: 36
+  #     label: "Guarantor 2 — Name and guarantee type"
+  #     answer: "Mr. Theodore Sebastian Hartmann (personal capacity); unlimited personal guarantee"
+
+  #   - id: 37
+  #     label: "Guarantor 3 — Name, ACN and guarantee type"
+  #     answer: "Araluen Processing & Logistics Pty Ltd, ACN 166 204 533; unlimited guarantee"
+
+  #   - id: 38
+  #     label: "Guarantor 4 — Name and guarantee cap"
+  #     answer: "Ms. Rosalind Therese Nakamura (personal capacity); capped at AUD $5,000,000"
+
+  #   # ── FACILITY STRUCTURE ────────────────────────────────────────────────────
+  #   - id: 39
+  #     label: "Total Approved Facility Amount"
+  #     answer: "AUD $47,500,000"
+
+  #   - id: 40
+  #     label: "Tranche A — Facility Type and Approved Limit"
+  #     answer: "Term Loan Facility; AUD $28,000,000"
+
+  #   - id: 41
+  #     label: "Tranche B — Facility Type and Approved Limit"
+  #     answer: "Revolving Credit Facility; AUD $12,500,000"
+
+  #   - id: 42
+  #     label: "Tranche C — Facility Type and Approved Limit"
+  #     answer: "Trade Finance Facility; AUD $7,000,000 (or USD equivalent)"
+
+  #   - id: 43
+  #     label: "Tranche A — Primary Purpose (two components)"
+  #     answer: "Refinance WABA facility (AUD $31,200,000 outstanding) and fund Stage 2 Murchison East expansion (estimated AUD $18,500,000 capex)"
+
+  #   - id: 44
+  #     label: "Tranche B — Minimum Drawdown Amount"
+  #     answer: "AUD $500,000 minimum; multiples of AUD $250,000 thereafter"
+
+  #   - id: 45
+  #     label: "Tranche C — Maximum Tenor per Instrument"
+  #     answer: "180 days"
+
+  #   - id: 46
+  #     label: "Revolving Credit Facility — Conversion Date and Mechanics"
+  #     answer: "Converts to term loan on 30 June 2026; outstanding balance repaid in 8 equal quarterly instalments to Final Maturity Date"
+
+  #   # ── INTEREST RATES & MARGINS ──────────────────────────────────────────────
+  #   - id: 47
+  #     label: "Base Rate"
+  #     answer: "Secured Overnight Financing Rate (SOFR) — compounded in arrears with 5 Business Day lookback"
+
+  #   - id: 48
+  #     label: "Initial Margin — Term Loan (Tranche A)"
+  #     answer: "2.85% per annum above SOFR"
+
+  #   - id: 49
+  #     label: "Margin — Revolving Credit AUD drawdowns"
+  #     answer: "2.65% per annum above SOFR"
+
+  #   - id: 50
+  #     label: "Margin — Revolving Credit USD drawdowns"
+  #     answer: "2.75% per annum above SOFR"
+
+  #   - id: 51
+  #     label: "Default Interest Margin (above applicable rate)"
+  #     answer: "Additional 2.00% per annum, compounded monthly"
+
+  #   - id: 52
+  #     label: "Margin Grid — Leverage > 3.50x"
+  #     answer: "3.25% per annum"
+
+  #   - id: 53
+  #     label: "Margin Grid — Leverage 2.50x to 3.50x (inclusive)"
+  #     answer: "2.85% per annum"
+
+  #   - id: 54
+  #     label: "Margin Grid — Leverage 1.50x to 2.50x (exclusive)"
+  #     answer: "2.40% per annum"
+
+  #   - id: 55
+  #     label: "Margin Grid — Leverage below 1.50x"
+  #     answer: "2.10% per annum"
+
+  #   - id: 56
+  #     label: "Interest Period — Term Loan"
+  #     answer: "3 months (quarterly)"
+
+  #   - id: 57
+  #     label: "Interest Period — Revolving Credit (options)"
+  #     answer: "1, 2, or 3 months (Borrower's choice per Drawdown Notice)"
+
+  #   # ── FEES ──────────────────────────────────────────────────────────────────
+  #   - id: 58
+  #     label: "Establishment / Origination Fee"
+  #     answer: "AUD $237,500 (0.50% of total facility); payable on or before Financial Close Date"
+
+  #   - id: 59
+  #     label: "Annual Line Fee — Tranche A"
+  #     answer: "AUD $70,000 per annum (0.25% of Term Loan limit); payable on each anniversary of Financial Close"
+
+  #   - id: 60
+  #     label: "Commitment Fee — Tranche B"
+  #     answer: "0.45% per annum on undrawn and uncancelled balance; payable quarterly in arrears"
+
+  #   - id: 61
+  #     label: "Trade Finance Issuance Fee — Tranche C"
+  #     answer: "1.25% per annum on face value of each instrument; charged at issuance"
+
+  #   - id: 62
+  #     label: "Security Trustee / Agency Fee"
+  #     answer: "AUD $15,000 per annum; payable 1 July annually"
+
+  #   - id: 63
+  #     label: "Amendment / Waiver Fee"
+  #     answer: "AUD $7,500 per request"
+
+  #   - id: 64
+  #     label: "Voluntary Prepayment Fee — Years 1 to 3 (before 1 July 2027)"
+  #     answer: "1.50% of the prepaid amount"
+
+  #   - id: 65
+  #     label: "Voluntary Prepayment Fee — Years 4 to 5 (1 July 2027 to 30 June 2029)"
+  #     answer: "0.75% of the prepaid amount"
+
+  #   - id: 66
+  #     label: "Voluntary Prepayment Fee — Years 6 to 7 (from 1 July 2029)"
+  #     answer: "Nil"
+
+  #   - id: 67
+  #     label: "Lender's Legal Costs (due diligence and preparation)"
+  #     answer: "AUD $185,000; payable on or before Financial Close Date"
+
+  #   # ── REPAYMENT & AMORTISATION ──────────────────────────────────────────────
+  #   - id: 68
+  #     label: "Term Loan — Number of Monthly Instalments"
+  #     answer: "83 consecutive monthly instalments"
+
+  #   - id: 69
+  #     label: "Term Loan — First Repayment Date"
+  #     answer: "1 August 2024"
+
+  #   - id: 70
+  #     label: "Term Loan — Monthly Principal (Ramp-up Period: Aug 2024 – Jul 2026)"
+  #     answer: "AUD $250,000 per month"
+
+  #   - id: 71
+  #     label: "Term Loan — Monthly Principal (Steady-State Period: Aug 2026 – Jul 2029)"
+  #     answer: "AUD $380,000 per month"
+
+  #   - id: 72
+  #     label: "Term Loan — Monthly Principal (Tail Period: Aug 2029 – Jun 2031)"
+  #     answer: "Approximately AUD $434,782.60 per month"
+
+  #   - id: 73
+  #     label: "Cash Sweep — Percentage of Excess Cash Flow applied annually"
+  #     answer: "30% of Excess Cash Flow; applied within 120 days of financial year end"
+
+  #   - id: 74
+  #     label: "Cash Sweep — First Application Date"
+  #     answer: "Within 120 days of 30 June 2025 (i.e. by approximately 28 October 2025)"
+
+  #   - id: 75
+  #     label: "Voluntary Prepayment — Minimum Amount and Increments"
+  #     answer: "Minimum AUD $1,000,000; multiples of AUD $500,000 thereafter"
+
+  #   - id: 76
+  #     label: "Voluntary Prepayment — Notice Period"
+  #     answer: "10 Business Days prior written notice"
+
+  #   # ── SECURITY ──────────────────────────────────────────────────────────────
+  #   - id: 77
+  #     label: "Aggregate Value of Security Package (independent valuation)"
+  #     answer: "AUD $89,300,000 (Crest Valuations Pty Ltd, Report CV-2024-0441, dated 28 May 2024)"
+
+  #   - id: 78
+  #     label: "Loan-to-Value Ratio at Close"
+  #     answer: "53.2% (AUD $47,500,000 / AUD $89,300,000)"
+
+  #   - id: 79
+  #     label: "Security Asset 1 — Description and Registered Value"
+  #     answer: "Mining Tenement ML70-0234, Murchison East Project WA; AUD $44,500,000; first-ranking mortgage"
+
+  #   - id: 80
+  #     label: "Security Asset 2 — Description and Registered Value"
+  #     answer: "Strata title SP 83471, Suite 901, 88 Pitt Street Sydney NSW; AUD $8,200,000; first-ranking mortgage"
+
+  #   - id: 81
+  #     label: "Security Asset 3 — Description and Registered Value"
+  #     answer: "Port Hedland Processing Facility, Lot 112, Nelson Point WA (Certificate of Title Vol 2874, Folio 119); AUD $29,600,000; first-ranking mortgage (grantor: Araluen Processing & Logistics Pty Ltd)"
+
+  #   - id: 82
+  #     label: "Security Asset 4 — Description and Book Value"
+  #     answer: "Mining plant and equipment at Murchison East; book value AUD $12,800,000; forced sale value AUD $7,000,000; fixed charge under General Security Deed"
+
+  #   - id: 83
+  #     label: "Key Person Life Insurance — Policy Number, Insurer and Sum Insured"
+  #     answer: "Policy No. ALA-2024-KP-00441; Apex Life Assurance Pty Ltd; sum insured AUD $10,000,000; assigned to Lender"
+
+  #   - id: 84
+  #     label: "PPSR Registration Deadline"
+  #     answer: "Within 20 Business Days of Financial Close Date"
+
+  #   # ── FINANCIAL COVENANTS ───────────────────────────────────────────────────
+  #   - id: 85
+  #     label: "Covenant Testing Frequency"
+  #     answer: "Quarterly — last day of March, June, September, and December"
+
+  #   - id: 86
+  #     label: "First Covenant Test Date"
+  #     answer: "31 December 2024"
+
+  #   - id: 87
+  #     label: "Compliance Certificate Delivery Deadline"
+  #     answer: "Within 45 days of each quarterly test date"
+
+  #   - id: 88
+  #     label: "Leverage Ratio Covenant — Initial Maximum"
+  #     answer: "Maximum 3.75x (reducing to 3.25x from 30 June 2026; 3.00x from 30 June 2028)"
+
+  #   - id: 89
+  #     label: "Interest Cover Ratio Covenant — Minimum"
+  #     answer: "Minimum 2.50x (increasing to 2.75x from 30 June 2026)"
+
+  #   - id: 90
+  #     label: "Debt Service Cover Ratio (DSCR) Covenant — Minimum"
+  #     answer: "Minimum 1.20x; tested quarterly"
+
+  #   - id: 91
+  #     label: "Minimum Consolidated EBITDA Covenant"
+  #     answer: "AUD $55,000,000 per annum (trailing 12 months)"
+
+  #   - id: 92
+  #     label: "Minimum Liquidity Covenant"
+  #     answer: "AUD $5,000,000 (unrestricted cash plus undrawn RCF); monitored monthly, notified within 15 days"
+
+  #   - id: 93
+  #     label: "Maximum Capital Expenditure Covenant (unfunded)"
+  #     answer: "AUD $8,000,000 per financial year; tested annually within 90 days of financial year end"
+
+  #   # ── REPORTING OBLIGATIONS ─────────────────────────────────────────────────
+  #   - id: 94
+  #     label: "Audited Annual Financial Statements — Delivery Deadline"
+  #     answer: "Within 120 days of financial year end (first delivery by 28 October 2025)"
+
+  #   - id: 95
+  #     label: "Quarterly Management Accounts — Delivery Deadline"
+  #     answer: "Within 45 days of each quarter end"
+
+  #   - id: 96
+  #     label: "Monthly Cash Flow Reports — Delivery Deadline"
+  #     answer: "Within 15 days of month end"
+
+  #   - id: 97
+  #     label: "Material Adverse Effect / Event of Default Notification"
+  #     answer: "Within 2 Business Days"
+
+  #   - id: 98
+  #     label: "Material Contracts Notification Threshold and Timeframe"
+  #     answer: "Contracts exceeding AUD $5,000,000; within 5 Business Days of execution"
+
+  #   # ── DRAWDOWN PROCEDURES ───────────────────────────────────────────────────
+  #   - id: 99
+  #     label: "Drawdown Notice Lead Time"
+  #     answer: "Not less than 3 Business Days prior to proposed Drawdown Date (by 10:00 AM Sydney time)"
+
+  #   - id: 100
+  #     label: "Drawdown Notice Submission Portal URL"
+  #     answer: "portal.meridianbank.com.au/corporate"
+
+  #   - id: 101
+  #     label: "Drawdown Notice Email (if portal unavailable)"
+  #     answer: "drawdowns@meridianbank.com.au"
+
+  #   # ── EVENTS OF DEFAULT ─────────────────────────────────────────────────────
+  #   - id: 102
+  #     label: "Non-payment Grace Period before Event of Default"
+  #     answer: "3 Business Days from due date"
+
+  #   - id: 103
+  #     label: "Financial Covenant Breach Cure Period"
+  #     answer: "20 Business Days after Lender gives notice"
+
+  #   - id: 104
+  #     label: "Cross-Default Threshold"
+  #     answer: "Financial indebtedness of the Borrower Group exceeding AUD $2,000,000 in aggregate"
+
+  #   - id: 105
+  #     label: "Environmental Breach Threshold triggering Event of Default"
+  #     answer: "Fine, penalty, or remediation obligation exceeding AUD $3,000,000"
+
+  #   - id: 106
+  #     label: "Business Abandonment Period triggering Event of Default"
+  #     answer: "Ceasing to carry on business for more than 30 consecutive days"
+
+  #   # ── MANDATORY PREPAYMENT ──────────────────────────────────────────────────
+  #   - id: 107
+  #     label: "Mandatory Prepayment — Disposal Proceeds Application Window"
+  #     answer: "Within 5 Business Days of receiving disposal proceeds"
+
+  #   - id: 108
+  #     label: "Mandatory Prepayment — Insurance Proceeds Threshold and Reinstatement Window"
+  #     answer: "Insurance proceeds exceeding AUD $1,000,000 must be applied unless reinvested within 120 days"
+
+  #   - id: 109
+  #     label: "Mandatory Prepayment — Equity Capital Raise Threshold"
+  #     answer: "Equity capital raised in excess of AUD $5,000,000"
+
+  #   # ── GOVERNING LAW & DISPUTE RESOLUTION ───────────────────────────────────
+  #   - id: 110
+  #     label: "Governing Law"
+  #     answer: "State of New South Wales, Australia"
+
+  #   - id: 111
+  #     label: "Key Legislation Referenced"
+  #     answer: "Banking Act 1959 (Cth); Corporations Act 2001 (Cth); Personal Property Securities Act 2009 (Cth); National Credit Code; Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
+
+  #   - id: 112
+  #     label: "Dispute Resolution — Senior Management Negotiation Period"
+  #     answer: "Not less than 20 Business Days following written notice of dispute"
+
+  #   - id: 113
+  #     label: "Dispute Resolution — Mediation Body and Location"
+  #     answer: "Australian Centre for International Commercial Arbitration (ACICA), Sydney"
+
+  #   - id: 114
+  #     label: "Dispute Resolution — Mediation Window before Litigation"
+  #     answer: "40 Business Days from referral to mediation"
+
+  #   # ── CONDITIONS PRECEDENT ──────────────────────────────────────────────────
+  #   - id: 115
+  #     label: "Conditions Precedent Satisfaction Deadline"
+  #     answer: "5:00 PM Sydney time on the Financial Close Date (1 July 2024)"
+
+  #   - id: 116
+  #     label: "ASIC Company Search Recency Requirement"
+  #     answer: "Not more than 5 Business Days old at Financial Close"
+
+  #   - id: 117
+  #     label: "WA Land Titles Mortgage Registration Deadline (post-close)"
+  #     answer: "Within 30 Business Days of Financial Close Date"
+
+  #   # ── COMPANY BACKGROUND FACTS ──────────────────────────────────────────────
+  #   - id: 118
+  #     label: "WABA Facility Outstanding Balance at Date of Agreement"
+  #     answer: "AUD $31,200,000"
+
+  #   - id: 119
+  #     label: "Stage 2 Murchison East Expansion — Estimated Capital Cost"
+  #     answer: "AUD $18,500,000"
+
+  #   - id: 120
+  #     label: "Borrower's Singapore Subsidiary — Name and UEN"
+  #     answer: "Araluen Asia Pte Ltd; UEN 201432887G"
+
+  #   - id: 121
+  #     label: "Borrower's Hong Kong Subsidiary — Name and CR Number"
+  #     answer: "Araluen Commodities HK Limited; CR No. 2847103"
+
+  #   - id: 122
+  #     label: "Independent Valuation Report Reference and Date"
+  #     answer: "Crest Valuations Pty Ltd, Report Reference CV-2024-0441, dated 28 May 2024"
+
+  #   - id: 123
+  #     label: "Permitted Disposal Annual Limit"
+  #     answer: "AUD $2,000,000 aggregate per financial year"
+
+  #   - id: 124
+  #     label: "Reporting Failure Cure Period before Event of Default"
+  #     answer: "10 Business Days following written notice from the Lender"
+
+
+  - id: task_snack_brand_prompt
+    name: "Snack Brand for Uni Café"
+    task_type: "Prompt"
     description: >
-      Below is a patient medical report. Write a prompt that instructs the AI
-      to extract the required information from this document as accurately as possible.
-    document: "documents/sample_medical_report.pdf"
-    items:
-      - id: 1
-        label: "Patient full name"
-        answer: "Emily Carter"
-      - id: 2
-        label: "Date of birth"
-        answer: "14 March 1987"
-      - id: 3
-        label: "Primary diagnosis"
-        answer: "Type 2 Diabetes Mellitus"
-      - id: 4
-        label: "Attending physician"
-        answer: "Dr. James Harrington"
-      - id: 5
-        label: "Prescribed medication"
-        answer: "Metformin 500 mg twice daily"
-
-  - id: task2
-    name: "Task 2: Research Paper Abstract"
-    description: >
-      You have been given a research paper abstract. Write a prompt to make the
-      AI extract the key information listed below from the abstract.
-    document: "documents/sample_abstract.pdf"
-    items:
-      - id: 1
-        label: "Paper title"
-        answer: "Deep Learning for Natural Language Processing: A Survey"
-      - id: 2
-        label: "First author's name"
-        answer: "Sarah Mitchell"
-      - id: 3
-        label: "Year of publication"
-        answer: "2023"
-      - id: 4
-        label: "Main research objective"
-        answer: "To survey deep learning techniques applied to NLP tasks"
-      - id: 5
-        label: "Key finding or conclusion"
-        answer: "Transformer-based models consistently outperform classical approaches across all NLP benchmarks"
-
-  - id: task_insurance_contract
-    name: "Task 3: Vantara Insurance Policy Information Extraction"
-    description: >
-      Write a prompt to extract the required information from this insurance policy document.
-    document: "documents/VantaraInsurancePolicy_VLG2024HCP00847.pdf"
-    items:
-
-    # IDENTIFICATION & POLICY DETAILS
-    - id: 1
-      label: "Policy Number"
-      answer: "VLG-2024-HCP-00847-AU"
-
-    - id: 2
-      label: "Policy Type"
-      answer: "Combined Health & Residential Property Insurance"
-
-    - id: 3
-      label: "Issue Date"
-      answer: "1 March 2024"
-
-    - id: 4
-      label: "Effective Date"
-      answer: "15 March 2024 (12:01 AM AEDT)"
-
-    - id: 5
-      label: "Expiry Date"
-      answer: "14 March 2025 (11:59 PM AEDT)"
-
-    - id: 6
-      label: "Policy Term"
-      answer: "12 months"
-
-    - id: 7
-      label: "Certificate No."
-      answer: "CERT-VLG-2024-08471"
-
-    - id: 8
-      label: "Regulatory Body"
-      answer: "Australian Prudential Regulation Authority (APRA)"
-
-    - id: 9
-      label: "AFS Licence Number"
-      answer: "293817 (issued by ASIC)"
-
-    - id: 10
-      label: "Product Disclosure Statement version and date"
-      answer: "PDS version 7.2, dated 1 January 2024"
-
-    # PARTIES — INSURER
-    - id: 11
-      label: "Legal Name of Insurer"
-      answer: "Vantara Life & General Insurance PLC"
-
-    - id: 12
-      label: "ABN of Insurer"
-      answer: "47 382 910 553"
-
-    - id: 13
-      label: "ACN of Insurer"
-      answer: "382 910 553"
-
-    - id: 14
-      label: "Registered Office Address of Insurer"
-      answer: "Level 24, 333 Collins Street, Melbourne VIC 3000, Australia"
-
-    - id: 15
-      label: "Phone Number of Insurer"
-      answer: "+61 3 9201 4400"
-
-    - id: 16
-      label: "Email of Insurer"
-      answer: "policyservices@vantarainsurance.com.au"
-
-    - id: 17
-      label: "Entity Type of Insurer"
-      answer: "Public Limited Company incorporated in Victoria, Australia"
-
-    - id: 18
-      label: "Chief Underwriting Officer Name"
-      answer: "Ms. Catherine Merriweather"
-
-    # PARTIES — NAMED INSURED
-    - id: 19
-      label: "Full Legal Name of Named Insured"
-      answer: "Mr. Harrison James Whitfield"
-
-    - id: 20
-      label: "Date of Birth of Named Insured"
-      answer: "14 September 1981 (Age: 42)"
-
-    - id: 21
-      label: "Gender of Named Insured"
-      answer: "Male"
-
-    - id: 22
-      label: "Residential Address of Named Insured"
-      answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
-
-    - id: 23
-      label: "Mobile Phone of Named Insured"
-      answer: "+61 412 774 502"
-
-    - id: 24
-      label: "Email of Named Insured"
-      answer: "h.whitfield@mailcentre.com.au"
-
-    - id: 25
-      label: "Occupation of Named Insured"
-      answer: "Senior Civil Engineer"
-
-    - id: 26
-      label: "Employer of Named Insured"
-      answer: "Aurelius Infrastructure Group Pty Ltd"
-
-    - id: 27
-      label: "Smoker Status of Named Insured"
-      answer: "Non-smoker (declared)"
-
-    # ADDITIONAL INSURED PARTIES
-    - id: 28
-      label: "Additional Insured 1 — Name, Relationship and Date of Birth"
-      answer: "Ms. Priya Kamala Whitfield (Spouse), DOB: 22 April 1984"
-
-    - id: 29
-      label: "Additional Insured 2 — Name, Relationship and Date of Birth"
-      answer: "Master Ethan Lucas Whitfield (Dependent Child), DOB: 3 July 2012"
-
-    - id: 30
-      label: "Additional Insured 3 — Name, Relationship and Date of Birth"
-      answer: "Miss Olivia Rose Whitfield (Dependent Child), DOB: 18 November 2015"
-
-    # BROKER / AGENT
-    - id: 31
-      label: "Broker Company Name and ABN"
-      answer: "Clearview Financial Advisory Pty Ltd, ABN 63 142 887 330"
-
-    - id: 32
-      label: "Broker Contact Person and Title"
-      answer: "Mr. Daniel Forsythe (Senior Insurance Adviser)"
-
-    - id: 33
-      label: "Broker Reference Number"
-      answer: "CVF-BKR-2024-3390"
-
-    - id: 34
-      label: "Broker Remuneration Type"
-      answer: "Commission-based (disclosed in FSG dated 10 January 2024)"
-
-    # FINANCIAL TERMS
-    - id: 35
-      label: "Total Annual Premium (incl. GST)"
-      answer: "AUD $4,218.00"
-
-    - id: 36
-      label: "Base Premium (excl. GST)"
-      answer: "AUD $3,834.00"
-
-    - id: 37
-      label: "GST Component"
-      answer: "AUD $383.40"
-
-    - id: 38
-      label: "Monthly Instalment Amount"
-      answer: "AUD $351.50"
-
-    - id: 39
-      label: "First Payment Date"
-      answer: "15 March 2024"
-
-    - id: 40
-      label: "Payment Method and Bank Details"
-      answer: "Monthly direct debit; BSB 063-000, Account 1234 5678 (Commonwealth Bank)"
-
-    - id: 41
-      label: "Grace Period for Late Payment"
-      answer: "14 calendar days"
-
-    - id: 42
-      label: "Annual Pay Discount Rate"
-      answer: "3% discount if full annual premium paid upfront"
-
-    - id: 43
-      label: "No-Claim Discount after 1 year"
-      answer: "10%"
-
-    - id: 44
-      label: "No-Claim Discount after 2 years"
-      answer: "15%"
-
-    - id: 45
-      label: "No-Claim Discount after 3 or more years"
-      answer: "20%"
-
-    - id: 46
-      label: "Health — Hospital Premium (total incl. GST)"
-      answer: "AUD $1,562.00"
-
-    - id: 47
-      label: "Health — Extras Premium (total incl. GST)"
-      answer: "AUD $748.00"
-
-    - id: 48
-      label: "Property — Building Premium (total incl. GST)"
-      answer: "AUD $961.40"
-
-    - id: 49
-      label: "Property — Contents Premium (total incl. GST)"
-      answer: "AUD $343.20"
-
-    - id: 50
-      label: "Public Liability Premium (total incl. GST)"
-      answer: "AUD $602.80"
-
-    # HEALTH COVERAGE — HOSPITAL
-    - id: 51
-      label: "Type of Health Cover"
-      answer: "Comprehensive Hospital & Extras Health Insurance"
-
-    - id: 52
-      label: "Private Hospital Room — Benefit and Limit"
-      answer: "100% of agreed schedule fee; Unlimited; $250 excess per admission"
-
-    - id: 53
-      label: "Surgical Procedures — Benefit and Limit"
-      answer: "100% of MBS schedule fee; $150,000 limit; $250 excess"
-
-    - id: 54
-      label: "ICU — Benefit, Limit and Excess"
-      answer: "100% of agreed fee; $75,000 limit; Nil excess"
-
-    - id: 55
-      label: "Obstetrics / Maternity — Benefit, Limit and Waiting Period"
-      answer: "100% of MBS schedule fee; $30,000 limit; 12-month waiting period; $250 excess"
-
-    - id: 56
-      label: "Psychiatric / Mental Health — Days per year and Annual Limit"
-      answer: "Up to 35 days/year inpatient; $25,000 annual limit"
-
-    - id: 57
-      label: "Rehabilitation — Days per year and Annual Limit"
-      answer: "Up to 30 days/year; $20,000 annual limit"
-
-    - id: 58
-      label: "Palliative Care — Benefit and Excess"
-      answer: "Covered in full; Unlimited; Nil excess"
-
-    - id: 59
-      label: "Emergency Ambulance — Benefit and Limit"
-      answer: "Covered in full; Unlimited"
-
-    - id: 60
-      label: "Overseas Emergency — Limit and Condition"
-      answer: "$50,000 limit; trips exceeding 90 continuous days excluded"
-
-    - id: 61
-      label: "Standard Excess per Hospital Admission"
-      answer: "$250"
-
-    # HEALTH COVERAGE — EXTRAS
-    - id: 62
-      label: "General Dental — Benefit, Annual Limit and Co-payment"
-      answer: "80% of schedule fee; $1,200 annual limit; $15 co-payment"
-
-    - id: 63
-      label: "Major Dental — Benefit, Annual Limit, Waiting Period and Co-payment"
-      answer: "60% of schedule fee; $2,500 annual limit; 12-month waiting period; $30 co-payment"
-
-    - id: 64
-      label: "Orthodontics — Benefit, Lifetime Limit and Waiting Period"
-      answer: "50% of schedule fee; $3,000 lifetime limit; 12-month waiting period"
-
-    - id: 65
-      label: "Optical — Annual Limit per person"
-      answer: "Up to $300 per person per year"
-
-    - id: 66
-      label: "Physiotherapy — Benefit, Annual Limit and Co-payment"
-      answer: "80% of schedule fee; $900 annual limit; $10 co-payment"
-
-    - id: 67
-      label: "Chiropractic — Benefit, Annual Limit and Co-payment"
-      answer: "80% of schedule fee; $600 annual limit; $10 co-payment"
-
-    - id: 68
-      label: "Psychology / Counselling — Benefit, Annual Limit and Co-payment"
-      answer: "80% of schedule fee; $1,500 annual limit; $10 co-payment"
-
-    - id: 69
-      label: "Podiatry — Benefit and Annual Limit"
-      answer: "80% of schedule fee; $500 annual limit"
-
-    - id: 70
-      label: "Pharmaceuticals (non-PBS) — Benefit and Annual Limit"
-      answer: "60% of cost; $800 annual limit; $20 co-payment"
-
-    - id: 71
-      label: "Hearing Aids — Benefit, Limit, Period and Waiting Period"
-      answer: "50% of cost; $2,000 per 3-year period; 36-month waiting period"
-
-    # WAITING PERIODS
-    - id: 72
-      label: "Waiting Period — Accidents and Emergency"
-      answer: "None"
-
-    - id: 73
-      label: "Waiting Period — General Medical and Surgical"
-      answer: "2 months"
-
-    - id: 74
-      label: "Waiting Period — Obstetrics and Maternity"
-      answer: "12 months"
-
-    - id: 75
-      label: "Waiting Period — Major Dental and Orthodontics"
-      answer: "12 months"
-
-    - id: 76
-      label: "Waiting Period — Pre-existing Conditions (Hospital)"
-      answer: "12 months"
-
-    - id: 77
-      label: "Waiting Period — Psychiatric and Rehabilitation"
-      answer: "2 months (pre-existing conditions: 12 months)"
-
-    - id: 78
-      label: "Waiting Period — Hearing Aids"
-      answer: "36 months"
-
-    - id: 79
-      label: "Waiting Period — All Other Extras"
-      answer: "2 months"
-
-    # PROPERTY — INSURED PREMISES
-    - id: 80
-      label: "Property Address"
-      answer: "42 Banksia Grove, Doncaster East VIC 3109, Australia"
-
-    - id: 81
-      label: "Property Type and Tenure"
-      answer: "Single-storey residential dwelling on freehold title"
-
-    - id: 82
-      label: "Year Built"
-      answer: "1997"
-
-    - id: 83
-      label: "Construction Materials"
-      answer: "Brick veneer exterior; timber frame; terracotta tile roof"
-
-    - id: 84
-      label: "Land Area"
-      answer: "685 square metres (approx.)"
-
-    - id: 85
-      label: "Local Council"
-      answer: "City of Manningham"
-
-    - id: 86
-      label: "Title Reference"
-      answer: "Volume 9432, Folio 177"
-
-    - id: 87
-      label: "Bushfire Attack Level (BAL)"
-      answer: "BAL-12.5"
-
-    # PROPERTY — BUILDING COVER
-    - id: 88
-      label: "Sum Insured — Building"
-      answer: "AUD $850,000 (agreed value, replacement cost basis)"
-
-    - id: 89
-      label: "Additional Structures — Combined Limit"
-      answer: "$50,000 combined (garage, garden shed, fencing, in-ground swimming pool)"
-
-    - id: 90
-      label: "Debris Removal — Limit as percentage of Sum Insured"
-      answer: "Up to 10% of Building Sum Insured"
-
-    - id: 91
-      label: "Architects and Engineers — Limit as percentage of Sum Insured"
-      answer: "Up to 5% of Building Sum Insured"
-
-    - id: 92
-      label: "Temporary Accommodation — Weekly Rate and Maximum Duration"
-      answer: "AUD $1,500/week for up to 52 weeks while uninhabitable"
-
-    - id: 93
-      label: "Mortgagee Name and Loan Reference Number"
-      answer: "Commonwealth Bank of Australia; Loan No. CBA-MTG-0047883"
-
-    - id: 94
-      label: "Standard Excess — Building"
-      answer: "AUD $500"
-
-    - id: 95
-      label: "Excess for Earthquake and Flood"
-      answer: "AUD $1,000"
-
-    # PROPERTY — CONTENTS COVER
-    - id: 96
-      label: "Sum Insured — Contents"
-      answer: "AUD $120,000"
-
-    - id: 97
-      label: "Basis of Settlement"
-      answer: "Replacement as new"
-
-    - id: 98
-      label: "Single Article Limit (unspecified items)"
-      answer: "AUD $5,000 per unspecified item"
-
-    - id: 99
-      label: "Jewellery and Watches — Combined Limit"
-      answer: "AUD $10,000 combined"
-
-    - id: 100
-      label: "Portable Electronics — Combined Limit"
-      answer: "AUD $8,000 combined"
-
-    - id: 101
-      label: "Cash and Negotiable Instruments — Maximum"
-      answer: "AUD $500"
-
-    - id: 102
-      label: "Standard Excess — Contents"
-      answer: "AUD $250"
-
-    # LIABILITY COVER
-    - id: 103
-      label: "Liability Sum Insured — per occurrence and aggregate"
-      answer: "AUD $20,000,000 per occurrence and in the aggregate"
-
-    - id: 104
-      label: "Legal Defence Costs — how covered"
-      answer: "Covered in addition to the Liability Sum Insured"
-
-    # SCHEDULED HIGH-VALUE ITEMS
-    - id: 105
-      label: "Item B-01 — Description, Value and Certificate Number"
-      answer: "Diamond engagement ring (platinum setting); AUD $18,500; CERT-GIA-2009-447812"
-
-    - id: 106
-      label: "Item B-02 — Description, Value and Serial Number"
-      answer: "Omega Seamaster 300m wristwatch; AUD $8,200; S/N 78341092"
-
-    - id: 107
-      label: "Item B-03 — Description, Value and Serial Number"
-      answer: "Sony Alpha A7 IV camera system (body + 3 lenses); AUD $6,800; S/N 3841759-A"
-
-    - id: 108
-      label: "Item B-04 — Description, Value and Serial Number"
-      answer: "Trek Domane SL6 mountain bicycle (2022); AUD $5,400; S/N WTU2209-00213"
-
-    - id: 109
-      label: "Item B-05 — Description, Value and Provenance Reference"
-      answer: "'Autumn on the Yarra' oil painting by D. Renshaw (2018); AUD $4,500; Provenance ref GVG-4412"
-
-    - id: 110
-      label: "Item B-06 — Description, Value and Serial Number"
-      answer: "Apple MacBook Pro 16-inch M3 Max laptop; AUD $4,200; S/N C02ZQ1NDMD6T"
-
-    # BENEFICIARIES
-    - id: 111
-      label: "Primary Beneficiary — Name, Relationship and Share"
-      answer: "Ms. Priya Kamala Whitfield (Spouse) — 100% of death benefit"
-
-    - id: 112
-      label: "Contingent Beneficiary — Names and Condition"
-      answer: "Master Ethan Lucas Whitfield and Miss Olivia Rose Whitfield (equally), if primary beneficiary predeceases"
-
-    - id: 113
-      label: "Estate Fallback — Condition"
-      answer: "Payable to the Estate of the Named Insured if no surviving named beneficiary"
-
-    # RIDERS & ENDORSEMENTS
-    - id: 114
-      label: "END-C1 — Benefit Type, Amount, Status and Additional Premium"
-      answer: "Accidental Death Benefit; AUD $200,000 lump sum; Active; +AUD $180.00/year"
-
-    - id: 115
-      label: "END-C2 — Benefit Type, Percentage, Waiting Period, Age Limit, Monthly Cap, Status and Additional Premium"
-      answer: "Income Protection; 75% of pre-disability income; 90-day waiting period; to age 65; AUD $12,500 monthly cap; Active; +AUD $420.00/year"
-
-    - id: 116
-      label: "END-C3 — Benefit Type, Maximum Benefit and Status"
-      answer: "Fertility Treatment Benefit; up to AUD $15,000 per couple; Not Selected"
-
-    - id: 117
-      label: "END-C4 — Benefit Type, Coverage Limit, Status and Additional Premium"
-      answer: "Home Office Extension; AUD $10,000 equipment limit; Active; +AUD $95.00/year"
-
-    - id: 118
-      label: "END-C5 — Benefit Type, Coverage Limit, Status and Additional Premium"
-      answer: "Pet Injury Liability; AUD $500,000 per occurrence; Active; +AUD $45.00/year"
-
-    - id: 119
-      label: "END-C6 — Benefit Type, Excess and Status"
-      answer: "Flood Upgrade (full flood cover); AUD $1,000 excess; Not Selected"
-
-    - id: 120
-      label: "END-C7 — Status and Additional Premium"
-      answer: "Scheduled High-Value Items endorsement; Active; +AUD $175.00/year"
-
-    # CLAIMS
-    - id: 121
-      label: "Notification Timeframe — Theft and Burglary"
-      answer: "Within 24 hours of discovery; police report must be obtained within 48 hours"
-
-    - id: 122
-      label: "Notification Timeframe — Property Damage"
-      answer: "Within 7 days of the Insured Event"
-
-    - id: 123
-      label: "Notification Timeframe — Health Claims"
-      answer: "Within 60 days of the date of service or discharge from hospital"
-
-    - id: 124
-      label: "Claims Phone Number"
-      answer: "1800 VANTARA (1800 826 827)"
-
-    - id: 125
-      label: "Claims Email Address"
-      answer: "claims@vantarainsurance.com.au"
-
-    - id: 126
-      label: "Claims Decision Timeframe"
-      answer: "10 Business Days (complex property claims: up to 20 Business Days)"
-
-    - id: 127
-      label: "Settlement Payment Timeframe after Approval"
-      answer: "Within 5 Business Days of claim approval"
-
-    - id: 128
-      label: "Reinstatement Window and Fee"
-      answer: "Within 60 days of lapse date; AUD $55 administration fee"
-
-    - id: 129
-      label: "Cancellation Administration Fee"
-      answer: "AUD $75"
-
-    - id: 130
-      label: "Cooling-off Period Duration and Refund Terms"
-      answer: "21 days from date of issue; full premium refund if no claim has been made"
-
-    # LEGAL & REGULATORY
-    - id: 131
-      label: "Governing Law — State and Country"
-      answer: "State of Victoria, Australia"
-
-    - id: 132
-      label: "Key Legislation Referenced"
-      answer: "Insurance Contracts Act 1984 (Cth); Insurance Act 1973 (Cth); Privacy Act 1988 (Cth); Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-
-    - id: 133
-      label: "External Dispute Resolution Body — Name and Phone Number"
-      answer: "Australian Financial Complaints Authority (AFCA); 1800 931 678"
-
-    - id: 134
-      label: "EDR Time Limit for Referral"
-      answer: "Within 2 years of the Insurer's final IDR response"
-
-    - id: 135
-      label: "IDR Response Timeframe"
-      answer: "30 calendar days"
-
-    - id: 136
-      label: "Renewal Notice Period"
-      answer: "Minimum 21 days prior to the Expiry Date"
-
-    - id: 137
-      label: "Risk Change Notification Timeframe"
-      answer: "Within 14 Business Days"
-
-    - id: 138
-      label: "Cancellation Notice Period by Insurer"
-      answer: "Minimum 14 days written notice by registered post or email"
-
-    - id: 139
-      label: "Witness to Signature — Name and Date"
-      answer: "Mr. Samuel Okafor; 1 March 2024"
-
-  - id: task_meridian_loan_agreement
-    name: "Task 4: Meridian Commercial Facility Agreement Information Extraction"
-    description: >
-      Write a prompt to extract the required information from this commercial
-      facility agreement. Be precise — many facts are buried within long
-      paragraphs, and decoy numbers appear near the correct answers.
-    document: "documents/MeridianFacilityAgreement_MCB2024CFA00312.pdf"
+      You are launching a new snack brand at the university café and want to use AI to help with the launch. You are going to leverage the capabilities of AI to support your launch.
+    instructions:
+      - verb: "Read"
+        text: "the scenario."
+      - verb: "Write"
+        text: "a prompt and submit."
+      - verb: "Review"
+        text: "your prompt based on feedback."
+    prompt_panel_body: >
+      Write a prompt to get creative names for your snack brand.
+    prompt_panel_title: "Write your prompt"
+    prompt_placeholder: "Generate 5 snack brand names. Remember: Writing Task = Short Input → Long Output"
     judge_persona: "generous"
-    items:
-
-    # ── AGREEMENT IDENTIFICATION ─────────────────────────────────────────────
-    - id: 1
-      label: "Agreement Reference Number"
-      answer: "MCB-CFA-2024-00312-SYD"
-
-    - id: 2
-      label: "Credit Committee Approval Reference"
-      answer: "MCB-CC-2024-0884 (approved 7 June 2024)"
-
-    - id: 3
-      label: "Date of Agreement (execution date)"
-      answer: "14 June 2024"
-
-    - id: 4
-      label: "Financial Close Date"
-      answer: "1 July 2024"
-
-    - id: 5
-      label: "Final Maturity Date"
-      answer: "30 June 2031"
-
-    - id: 6
-      label: "Total Facility Tenor"
-      answer: "7 years"
-
-    - id: 7
-      label: "Mandatory Review / Repricing Date"
-      answer: "30 June 2028"
-
-    - id: 8
-      label: "Revolving Credit Facility Availability Period End Date"
-      answer: "30 June 2026"
-
-    - id: 9
-      label: "Borrower's Solicitors — firm name and matter reference"
-      answer: "Carrington & Webb Lawyers, reference CWL-MCB-2024-0047"
-
-    - id: 10
-      label: "Lender's Solicitors — firm name and matter reference"
-      answer: "Hallsworth Finch & Partners, reference HFP-MCB-2024-3301"
-
-    # ── LENDER DETAILS ────────────────────────────────────────────────────────
-    - id: 11
-      label: "Lender — Legal Name"
-      answer: "Meridian Commercial Bank Limited"
-
-    - id: 12
-      label: "Lender — ABN"
-      answer: "58 204 719 336"
-
-    - id: 13
-      label: "Lender — ACN"
-      answer: "204 719 336"
-
-    - id: 14
-      label: "Lender — AFSL Number"
-      answer: "298841"
-
-    - id: 15
-      label: "Lender — Australian Credit Licence Number"
-      answer: "298841"
-
-    - id: 16
-      label: "Lender — Registered Office Address"
-      answer: "Level 38, 1 Macquarie Place, Sydney NSW 2000, Australia"
-
-    - id: 17
-      label: "Lender — SWIFT / BIC Code"
-      answer: "MCBLAU2SXXX"
-
-    - id: 18
-      label: "Lender — Corporate Banking Phone"
-      answer: "+61 2 9247 8800"
-
-    - id: 19
-      label: "Lender — Corporate Banking Email"
-      answer: "corporatebanking@meridianbank.com.au"
-
-    - id: 20
-      label: "Lender — Drawdown Notices Email"
-      answer: "drawdowns@meridianbank.com.au"
-
-    - id: 21
-      label: "Lender — Signatory Name and Title"
-      answer: "Mr. Jonathan Phillip Quested, Executive Director, Corporate Banking"
-
-    - id: 22
-      label: "Lender — Second Signatory Name and Title"
-      answer: "Ms. Victoria Anne Pemberton, General Counsel & Company Secretary"
-
-    # ── BORROWER DETAILS ──────────────────────────────────────────────────────
-    - id: 23
-      label: "Borrower — Legal Name"
-      answer: "Araluen Resources & Exports Pty Ltd"
-
-    - id: 24
-      label: "Borrower — ACN"
-      answer: "144 827 591"
-
-    - id: 25
-      label: "Borrower — ABN"
-      answer: "73 144 827 591"
-
-    - id: 26
-      label: "Borrower — Date of Incorporation"
-      answer: "17 March 2011"
-
-    - id: 27
-      label: "Borrower — Registered and Trading Address"
-      answer: "Suite 901, 88 Pitt Street, Sydney NSW 2000, Australia"
-
-    - id: 28
-      label: "Borrower — Chief Financial Officer (name and email)"
-      answer: "Ms. Rosalind Therese Nakamura; r.nakamura@arex.com.au"
-
-    - id: 29
-      label: "Borrower — CFO Phone"
-      answer: "+61 2 8231 4470"
-
-    - id: 30
-      label: "Borrower — Managing Director / Authorised Signatory"
-      answer: "Mr. Theodore Sebastian Hartmann"
-
-    - id: 31
-      label: "Borrower — Board Resolution authorising execution"
-      answer: "ARE-BR-2024-042 dated 5 June 2024"
-
-    - id: 32
-      label: "Borrower — Consolidated Audited Revenue (FY2023)"
-      answer: "AUD $312,800,000"
-
-    - id: 33
-      label: "Borrower — EBITDA (FY2023)"
-      answer: "AUD $71,400,000"
-
-    - id: 34
-      label: "Borrower — Net Profit After Tax (FY2023)"
-      answer: "AUD $38,200,000"
-
-    # ── GUARANTORS ────────────────────────────────────────────────────────────
-    - id: 35
-      label: "Guarantor 1 — Name, ACN and guarantee limit"
-      answer: "Hartmann Family Holdings Pty Ltd, ACN 098 334 712; guarantee limited to AUD $25,000,000"
-
-    - id: 36
-      label: "Guarantor 2 — Name and guarantee type"
-      answer: "Mr. Theodore Sebastian Hartmann (personal capacity); unlimited personal guarantee"
-
-    - id: 37
-      label: "Guarantor 3 — Name, ACN and guarantee type"
-      answer: "Araluen Processing & Logistics Pty Ltd, ACN 166 204 533; unlimited guarantee"
-
-    - id: 38
-      label: "Guarantor 4 — Name and guarantee cap"
-      answer: "Ms. Rosalind Therese Nakamura (personal capacity); capped at AUD $5,000,000"
-
-    # ── FACILITY STRUCTURE ────────────────────────────────────────────────────
-    - id: 39
-      label: "Total Approved Facility Amount"
-      answer: "AUD $47,500,000"
-
-    - id: 40
-      label: "Tranche A — Facility Type and Approved Limit"
-      answer: "Term Loan Facility; AUD $28,000,000"
-
-    - id: 41
-      label: "Tranche B — Facility Type and Approved Limit"
-      answer: "Revolving Credit Facility; AUD $12,500,000"
-
-    - id: 42
-      label: "Tranche C — Facility Type and Approved Limit"
-      answer: "Trade Finance Facility; AUD $7,000,000 (or USD equivalent)"
-
-    - id: 43
-      label: "Tranche A — Primary Purpose (two components)"
-      answer: "Refinance WABA facility (AUD $31,200,000 outstanding) and fund Stage 2 Murchison East expansion (estimated AUD $18,500,000 capex)"
-
-    - id: 44
-      label: "Tranche B — Minimum Drawdown Amount"
-      answer: "AUD $500,000 minimum; multiples of AUD $250,000 thereafter"
-
-    - id: 45
-      label: "Tranche C — Maximum Tenor per Instrument"
-      answer: "180 days"
-
-    - id: 46
-      label: "Revolving Credit Facility — Conversion Date and Mechanics"
-      answer: "Converts to term loan on 30 June 2026; outstanding balance repaid in 8 equal quarterly instalments to Final Maturity Date"
-
-    # ── INTEREST RATES & MARGINS ──────────────────────────────────────────────
-    - id: 47
-      label: "Base Rate"
-      answer: "Secured Overnight Financing Rate (SOFR) — compounded in arrears with 5 Business Day lookback"
-
-    - id: 48
-      label: "Initial Margin — Term Loan (Tranche A)"
-      answer: "2.85% per annum above SOFR"
-
-    - id: 49
-      label: "Margin — Revolving Credit AUD drawdowns"
-      answer: "2.65% per annum above SOFR"
-
-    - id: 50
-      label: "Margin — Revolving Credit USD drawdowns"
-      answer: "2.75% per annum above SOFR"
-
-    - id: 51
-      label: "Default Interest Margin (above applicable rate)"
-      answer: "Additional 2.00% per annum, compounded monthly"
-
-    - id: 52
-      label: "Margin Grid — Leverage > 3.50x"
-      answer: "3.25% per annum"
-
-    - id: 53
-      label: "Margin Grid — Leverage 2.50x to 3.50x (inclusive)"
-      answer: "2.85% per annum"
-
-    - id: 54
-      label: "Margin Grid — Leverage 1.50x to 2.50x (exclusive)"
-      answer: "2.40% per annum"
-
-    - id: 55
-      label: "Margin Grid — Leverage below 1.50x"
-      answer: "2.10% per annum"
-
-    - id: 56
-      label: "Interest Period — Term Loan"
-      answer: "3 months (quarterly)"
-
-    - id: 57
-      label: "Interest Period — Revolving Credit (options)"
-      answer: "1, 2, or 3 months (Borrower's choice per Drawdown Notice)"
-
-    # ── FEES ──────────────────────────────────────────────────────────────────
-    - id: 58
-      label: "Establishment / Origination Fee"
-      answer: "AUD $237,500 (0.50% of total facility); payable on or before Financial Close Date"
-
-    - id: 59
-      label: "Annual Line Fee — Tranche A"
-      answer: "AUD $70,000 per annum (0.25% of Term Loan limit); payable on each anniversary of Financial Close"
-
-    - id: 60
-      label: "Commitment Fee — Tranche B"
-      answer: "0.45% per annum on undrawn and uncancelled balance; payable quarterly in arrears"
-
-    - id: 61
-      label: "Trade Finance Issuance Fee — Tranche C"
-      answer: "1.25% per annum on face value of each instrument; charged at issuance"
-
-    - id: 62
-      label: "Security Trustee / Agency Fee"
-      answer: "AUD $15,000 per annum; payable 1 July annually"
-
-    - id: 63
-      label: "Amendment / Waiver Fee"
-      answer: "AUD $7,500 per request"
-
-    - id: 64
-      label: "Voluntary Prepayment Fee — Years 1 to 3 (before 1 July 2027)"
-      answer: "1.50% of the prepaid amount"
-
-    - id: 65
-      label: "Voluntary Prepayment Fee — Years 4 to 5 (1 July 2027 to 30 June 2029)"
-      answer: "0.75% of the prepaid amount"
-
-    - id: 66
-      label: "Voluntary Prepayment Fee — Years 6 to 7 (from 1 July 2029)"
-      answer: "Nil"
-
-    - id: 67
-      label: "Lender's Legal Costs (due diligence and preparation)"
-      answer: "AUD $185,000; payable on or before Financial Close Date"
-
-    # ── REPAYMENT & AMORTISATION ──────────────────────────────────────────────
-    - id: 68
-      label: "Term Loan — Number of Monthly Instalments"
-      answer: "83 consecutive monthly instalments"
-
-    - id: 69
-      label: "Term Loan — First Repayment Date"
-      answer: "1 August 2024"
-
-    - id: 70
-      label: "Term Loan — Monthly Principal (Ramp-up Period: Aug 2024 – Jul 2026)"
-      answer: "AUD $250,000 per month"
-
-    - id: 71
-      label: "Term Loan — Monthly Principal (Steady-State Period: Aug 2026 – Jul 2029)"
-      answer: "AUD $380,000 per month"
-
-    - id: 72
-      label: "Term Loan — Monthly Principal (Tail Period: Aug 2029 – Jun 2031)"
-      answer: "Approximately AUD $434,782.60 per month"
-
-    - id: 73
-      label: "Cash Sweep — Percentage of Excess Cash Flow applied annually"
-      answer: "30% of Excess Cash Flow; applied within 120 days of financial year end"
-
-    - id: 74
-      label: "Cash Sweep — First Application Date"
-      answer: "Within 120 days of 30 June 2025 (i.e. by approximately 28 October 2025)"
-
-    - id: 75
-      label: "Voluntary Prepayment — Minimum Amount and Increments"
-      answer: "Minimum AUD $1,000,000; multiples of AUD $500,000 thereafter"
-
-    - id: 76
-      label: "Voluntary Prepayment — Notice Period"
-      answer: "10 Business Days prior written notice"
-
-    # ── SECURITY ──────────────────────────────────────────────────────────────
-    - id: 77
-      label: "Aggregate Value of Security Package (independent valuation)"
-      answer: "AUD $89,300,000 (Crest Valuations Pty Ltd, Report CV-2024-0441, dated 28 May 2024)"
-
-    - id: 78
-      label: "Loan-to-Value Ratio at Close"
-      answer: "53.2% (AUD $47,500,000 / AUD $89,300,000)"
-
-    - id: 79
-      label: "Security Asset 1 — Description and Registered Value"
-      answer: "Mining Tenement ML70-0234, Murchison East Project WA; AUD $44,500,000; first-ranking mortgage"
-
-    - id: 80
-      label: "Security Asset 2 — Description and Registered Value"
-      answer: "Strata title SP 83471, Suite 901, 88 Pitt Street Sydney NSW; AUD $8,200,000; first-ranking mortgage"
-
-    - id: 81
-      label: "Security Asset 3 — Description and Registered Value"
-      answer: "Port Hedland Processing Facility, Lot 112, Nelson Point WA (Certificate of Title Vol 2874, Folio 119); AUD $29,600,000; first-ranking mortgage (grantor: Araluen Processing & Logistics Pty Ltd)"
-
-    - id: 82
-      label: "Security Asset 4 — Description and Book Value"
-      answer: "Mining plant and equipment at Murchison East; book value AUD $12,800,000; forced sale value AUD $7,000,000; fixed charge under General Security Deed"
-
-    - id: 83
-      label: "Key Person Life Insurance — Policy Number, Insurer and Sum Insured"
-      answer: "Policy No. ALA-2024-KP-00441; Apex Life Assurance Pty Ltd; sum insured AUD $10,000,000; assigned to Lender"
-
-    - id: 84
-      label: "PPSR Registration Deadline"
-      answer: "Within 20 Business Days of Financial Close Date"
-
-    # ── FINANCIAL COVENANTS ───────────────────────────────────────────────────
-    - id: 85
-      label: "Covenant Testing Frequency"
-      answer: "Quarterly — last day of March, June, September, and December"
-
-    - id: 86
-      label: "First Covenant Test Date"
-      answer: "31 December 2024"
-
-    - id: 87
-      label: "Compliance Certificate Delivery Deadline"
-      answer: "Within 45 days of each quarterly test date"
-
-    - id: 88
-      label: "Leverage Ratio Covenant — Initial Maximum"
-      answer: "Maximum 3.75x (reducing to 3.25x from 30 June 2026; 3.00x from 30 June 2028)"
-
-    - id: 89
-      label: "Interest Cover Ratio Covenant — Minimum"
-      answer: "Minimum 2.50x (increasing to 2.75x from 30 June 2026)"
-
-    - id: 90
-      label: "Debt Service Cover Ratio (DSCR) Covenant — Minimum"
-      answer: "Minimum 1.20x; tested quarterly"
-
-    - id: 91
-      label: "Minimum Consolidated EBITDA Covenant"
-      answer: "AUD $55,000,000 per annum (trailing 12 months)"
-
-    - id: 92
-      label: "Minimum Liquidity Covenant"
-      answer: "AUD $5,000,000 (unrestricted cash plus undrawn RCF); monitored monthly, notified within 15 days"
-
-    - id: 93
-      label: "Maximum Capital Expenditure Covenant (unfunded)"
-      answer: "AUD $8,000,000 per financial year; tested annually within 90 days of financial year end"
-
-    # ── REPORTING OBLIGATIONS ─────────────────────────────────────────────────
-    - id: 94
-      label: "Audited Annual Financial Statements — Delivery Deadline"
-      answer: "Within 120 days of financial year end (first delivery by 28 October 2025)"
-
-    - id: 95
-      label: "Quarterly Management Accounts — Delivery Deadline"
-      answer: "Within 45 days of each quarter end"
-
-    - id: 96
-      label: "Monthly Cash Flow Reports — Delivery Deadline"
-      answer: "Within 15 days of month end"
-
-    - id: 97
-      label: "Material Adverse Effect / Event of Default Notification"
-      answer: "Within 2 Business Days"
-
-    - id: 98
-      label: "Material Contracts Notification Threshold and Timeframe"
-      answer: "Contracts exceeding AUD $5,000,000; within 5 Business Days of execution"
-
-    # ── DRAWDOWN PROCEDURES ───────────────────────────────────────────────────
-    - id: 99
-      label: "Drawdown Notice Lead Time"
-      answer: "Not less than 3 Business Days prior to proposed Drawdown Date (by 10:00 AM Sydney time)"
-
-    - id: 100
-      label: "Drawdown Notice Submission Portal URL"
-      answer: "portal.meridianbank.com.au/corporate"
-
-    - id: 101
-      label: "Drawdown Notice Email (if portal unavailable)"
-      answer: "drawdowns@meridianbank.com.au"
-
-    # ── EVENTS OF DEFAULT ─────────────────────────────────────────────────────
-    - id: 102
-      label: "Non-payment Grace Period before Event of Default"
-      answer: "3 Business Days from due date"
-
-    - id: 103
-      label: "Financial Covenant Breach Cure Period"
-      answer: "20 Business Days after Lender gives notice"
-
-    - id: 104
-      label: "Cross-Default Threshold"
-      answer: "Financial indebtedness of the Borrower Group exceeding AUD $2,000,000 in aggregate"
-
-    - id: 105
-      label: "Environmental Breach Threshold triggering Event of Default"
-      answer: "Fine, penalty, or remediation obligation exceeding AUD $3,000,000"
-
-    - id: 106
-      label: "Business Abandonment Period triggering Event of Default"
-      answer: "Ceasing to carry on business for more than 30 consecutive days"
-
-    # ── MANDATORY PREPAYMENT ──────────────────────────────────────────────────
-    - id: 107
-      label: "Mandatory Prepayment — Disposal Proceeds Application Window"
-      answer: "Within 5 Business Days of receiving disposal proceeds"
-
-    - id: 108
-      label: "Mandatory Prepayment — Insurance Proceeds Threshold and Reinstatement Window"
-      answer: "Insurance proceeds exceeding AUD $1,000,000 must be applied unless reinvested within 120 days"
-
-    - id: 109
-      label: "Mandatory Prepayment — Equity Capital Raise Threshold"
-      answer: "Equity capital raised in excess of AUD $5,000,000"
-
-    # ── GOVERNING LAW & DISPUTE RESOLUTION ───────────────────────────────────
-    - id: 110
-      label: "Governing Law"
-      answer: "State of New South Wales, Australia"
-
-    - id: 111
-      label: "Key Legislation Referenced"
-      answer: "Banking Act 1959 (Cth); Corporations Act 2001 (Cth); Personal Property Securities Act 2009 (Cth); National Credit Code; Anti-Money Laundering and Counter-Terrorism Financing Act 2006 (Cth)"
-
-    - id: 112
-      label: "Dispute Resolution — Senior Management Negotiation Period"
-      answer: "Not less than 20 Business Days following written notice of dispute"
-
-    - id: 113
-      label: "Dispute Resolution — Mediation Body and Location"
-      answer: "Australian Centre for International Commercial Arbitration (ACICA), Sydney"
-
-    - id: 114
-      label: "Dispute Resolution — Mediation Window before Litigation"
-      answer: "40 Business Days from referral to mediation"
-
-    # ── CONDITIONS PRECEDENT ──────────────────────────────────────────────────
-    - id: 115
-      label: "Conditions Precedent Satisfaction Deadline"
-      answer: "5:00 PM Sydney time on the Financial Close Date (1 July 2024)"
-
-    - id: 116
-      label: "ASIC Company Search Recency Requirement"
-      answer: "Not more than 5 Business Days old at Financial Close"
-
-    - id: 117
-      label: "WA Land Titles Mortgage Registration Deadline (post-close)"
-      answer: "Within 30 Business Days of Financial Close Date"
-
-    # ── COMPANY BACKGROUND FACTS ──────────────────────────────────────────────
-    - id: 118
-      label: "WABA Facility Outstanding Balance at Date of Agreement"
-      answer: "AUD $31,200,000"
-
-    - id: 119
-      label: "Stage 2 Murchison East Expansion — Estimated Capital Cost"
-      answer: "AUD $18,500,000"
-
-    - id: 120
-      label: "Borrower's Singapore Subsidiary — Name and UEN"
-      answer: "Araluen Asia Pte Ltd; UEN 201432887G"
-
-    - id: 121
-      label: "Borrower's Hong Kong Subsidiary — Name and CR Number"
-      answer: "Araluen Commodities HK Limited; CR No. 2847103"
-
-    - id: 122
-      label: "Independent Valuation Report Reference and Date"
-      answer: "Crest Valuations Pty Ltd, Report Reference CV-2024-0441, dated 28 May 2024"
-
-    - id: 123
-      label: "Permitted Disposal Annual Limit"
-      answer: "AUD $2,000,000 aggregate per financial year"
-
-    - id: 124
-      label: "Reporting Failure Cure Period before Event of Default"
-      answer: "10 Business Days following written notice from the Lender"
+    judge_prompt: |
+      ### LLM Judge Prompt
+
+      You are an evaluator assessing the quality of a student's prompt.
+
+      ---
+
+      ### Context
+      The student’s task is to write a prompt that instructs an AI to generate **5 names for a new snack brand at a university café**.
+
+      ---
+
+      ### Your Task
+      Evaluate the student’s prompt and assign a score out of **20 marks** based on the criteria below.
+
+      ---
+
+      ### Marking Criteria (Total = 100 marks)
+
+      #### 1. Clarity (25 marks)
+      - Is the prompt clear and easy to understand?
+      - Are instructions unambiguous?
+
+      #### 2. Task Alignment (25 marks)
+      - Does the prompt clearly ask for **5 snack brand names**?
+      - Is the university café context included?
+
+      #### 3. Specificity (25 marks)
+      - Does the prompt include useful details (e.g., target audience, tone, style, creativity)?
+      - Does it guide the AI beyond a generic request?
+
+      #### 4. Prompt Quality (25 marks)
+      - Is the prompt well-structured and effective for an LLM?
+      - Does it encourage relevant and creative outputs?
+
+      ---
+
+      ### Output Format
+
+      - **Score:** X/100  
+      - **Breakdown:**  
+        - Clarity: X/25  
+        - Task Alignment: X/25  
+        - Specificity: X/25  
+        - Prompt Quality: X/25  
+      - **Feedback:** 2–3 sentences explaining strengths and areas for improvement.
+
+      ---
+
+      ### Notes
+      - If the prompt is incomplete or does not match the task, give a low score and explain why.
+    evaluate_what: "prompt"
+
+  - id: task_customer_email_emotion
+    name: "Identify the Emotion in a Customer Email"
+    task_type: "Prompt"
+    description: >
+      A customer has sent an email to the university café after a recent experience.
+      Your job is to write a prompt that instructs an AI to read the email and identify
+      the customer's emotion — including the primary emotion, its intensity, and a brief
+      explanation of what in the email signals that emotion.
+    instructions:
+      - verb: "Read"
+        text: "the customer email below carefully."
+      - verb: "Copy"
+        text: "the email text and paste it into your prompt."
+      - verb: "Write"
+        text: "a prompt that instructs the AI to identify the emotion expressed in the email."
+      - verb: "Submit"
+        text: "your prompt and review the feedback."
+    prompt_panel_title: "Write your prompt"
+    prompt_panel_body: |
+      Subject: Absolutely Disgusted with Today's Service
+
+      To Whom It May Concern,
+
+      I am writing to express how deeply upset I was by my experience at the university café
+      this afternoon. I waited in line for over 20 minutes, only to be told that the item
+      I had been looking forward to all day was sold out — again. This is not the first time
+      this has happened, and frankly, I am starting to feel like my time and money mean
+      nothing to this café.
+
+      On top of that, when I asked the staff member if there was an alternative, I was
+      dismissed with a shrug and told to "check back tomorrow." That response was
+      completely unacceptable. I am a paying student and I deserve to be treated with
+      basic respect.
+
+      I genuinely used to enjoy coming here between lectures, but right now I am struggling
+      to find a reason to return. I sincerely hope the management takes this feedback
+      seriously and makes meaningful changes — because right now, the experience is simply
+      not good enough.
+
+      Regards,
+      Alex
+
+      Write a prompt asking the AI to identify the emotion, its intensity, and what signals it in the email.
+
+    prompt_placeholder: >
+      Paste the email here and write a prompt asking the AI to identify the emotion, its intensity,
+      and what signals it in the email. Remember: Reading Task = Long Input → Short Output.
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are an evaluator assessing the quality of a student's prompt.
+      ---
+      ### Context
+      The student's task is to write a prompt that instructs an AI to:
+      1. Read a provided customer email.
+      2. Identify the **primary emotion** expressed in the email.
+      3. Optionally assess the **intensity** of the emotion and **explain what signals** it.
+
+      The student is expected to **paste the customer email into their prompt** and then
+      write instructions directing the AI on what to do with it.
+      ---
+      ### Your Task
+      Evaluate the student's prompt and assign a score out of **100 marks** based on the
+      criteria below.
+      ---
+      ### Marking Criteria (Total = 100 marks)
+
+      #### 1. Clarity (25 marks)
+      - Is the prompt clear and easy to understand?
+      - Does it unambiguously instruct the AI to identify emotion(s)?
+
+      #### 2. Task Alignment (25 marks)
+      - Does the prompt include the customer email (pasted in)?
+      - Does it ask the AI to identify at least the **primary emotion** in the email?
+
+      #### 3. Specificity (25 marks)
+      - Does the prompt ask for additional detail beyond just naming the emotion
+        (e.g., intensity, textual evidence, tone analysis)?
+      - Does it guide the AI with useful context about the purpose or audience?
+
+      #### 4. Prompt Quality (25 marks)
+      - Is the prompt well-structured and effective for an LLM?
+      - Does it encourage a nuanced, insightful response rather than a one-word answer?
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Breakdown:**
+        - Clarity: X/25
+        - Task Alignment: X/25
+        - Specificity: X/25
+        - Prompt Quality: X/25
+      - **Feedback:** 2–3 sentences explaining strengths and areas for improvement.
+      ---
+      ### Notes
+      - If the student did **not** include the email in their prompt, deduct heavily from
+        Task Alignment (max 5/25 for that criterion).
+      - If the prompt only asks "what emotion is this?" with no email and no detail,
+        score it no higher than 30/100.
+      - If the prompt is completely off-task or blank, score 0 and explain why.
+    evaluate_what: "prompt"
+
+  - id: chat_snack_cafe_social_media
+    name: "Chat: Snack Café Social Media Strategy"
+    task_type: "Chat"
+    description: >
+      I'm thinking about the Snack Café's social media strategy. Help me think through the decision.
+      Start by asking me what you need to know.
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are an evaluator assessing the quality of a student's multi-turn chat conversation with an AI assistant.
+      
+      ---
+      ### Context
+      The student is planning the Snack Café's social media strategy. A good conversation should clarify goals,
+      audience, brand tone, platform choices, content ideas, cadence, and constraints (time, budget, approvals).
+      
+      You will be given the full chat transcript with lines beginning with:
+      - STUDENT: ...
+      - ASSISTANT: ...
+      
+      ---
+      ### Your Task
+      Evaluate the overall quality of the conversation and assign a score out of **100 marks** based on the criteria below.
+      
+      ---
+      ### Marking Criteria (Total = 100 marks)
+      
+      #### 1. Discovery_and_context (25 marks)
+      - Does the conversation surface the right context (goals, target audience, platforms, constraints)?
+      - Does the student respond with relevant details and clarify assumptions when needed?
+      
+      #### 2. Strategy_quality (25 marks)
+      - Are platform choices and content pillars sensible for a university café?
+      - Does it include concrete content ideas and a posting cadence that fits the context?
+      
+      #### 3. Practicality (25 marks)
+      - Are the recommended actions feasible (time/budget/staff constraints)?
+      - Does it include measurable next steps (e.g., 2-week plan, KPIs, what to test)?
+      
+      #### 4. Communication (25 marks)
+      - Is the student's communication clear, structured, and goal-oriented?
+      - Does the student ask useful follow-up questions and keep the discussion on track?
+      
+      ---
+      ### Output Format (MANDATORY)
+      Respond with ONLY a JSON object in this exact shape (no markdown, no extra text):
+      {
+        "total": <int 0-100>,
+        "breakdown": {
+          "Discovery_and_context": {"score": <int>, "max": 25},
+          "Strategy_quality": {"score": <int>, "max": 25},
+          "Practicality": {"score": <int>, "max": 25},
+          "Communication": {"score": <int>, "max": 25}
+        },
+        "feedback": "<2-3 sentences on strengths and improvements>"
+      }
+      
+      ---
+      ### Notes
+      - If the transcript is extremely short (e.g., only 1 student message), cap total at 40.
+      - If the student is off-topic or does not engage meaningfully, score low and explain why.
