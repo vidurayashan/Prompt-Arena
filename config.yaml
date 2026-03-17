@@ -1440,3 +1440,486 @@ tasks:
       ### Notes
       - If the transcript is extremely short (e.g., only 1 student message), cap total at 40.
       - If the student is off-topic or does not engage meaningfully, score low and explain why.
+
+  - id: task_chain_of_thought_enterprise_billing
+    name: "Chain-of-Thought: Enterprise SaaS Billing Calculator"
+    task_type: "Prompt"
+    description: >
+      An enterprise client is onboarding to a SaaS platform over 3 months.
+      The billing structure involves tiered user licences, optional add-ons,
+      month-specific discounts, conditional fees, credits, a surcharge threshold,
+      and selective GST — all of which must be resolved in the correct order.
+      Write a Chain-of-Thought prompt that guides the AI to work through every
+      step carefully and arrive at the correct grand total.
+    instructions:
+      - verb: "Read"
+        text: "the billing scenario below carefully — there are many moving parts."
+      - verb: "Write"
+        text: >
+          a Chain-of-Thought prompt that instructs the AI to solve the billing
+          problem step by step, month by month, showing all working before
+          stating the final total."
+      - verb: "Submit"
+        text: "your prompt and see whether the AI reaches the correct answer."
+
+    prompt_panel_title: "Write your Chain-of-Thought prompt"
+    prompt_panel_body: |
+      📋 Enterprise SaaS Billing Scenario
+
+      A company is onboarding to an enterprise SaaS platform over 3 months.
+      Calculate the total cost across all 3 months combined.
+
+      ── USER LICENCES (monthly) ──────────────────────
+      • 3 Admin users       @ $60/month each
+      • 5 Standard users    @ $35/month each
+      • 2 Read-Only users   @ $12/month each
+
+      ── ADD-ONS (monthly) ───────────────────────────
+      • Analytics Module    @ $80/month  → starts from Month 2 only
+      • API Access          @ $50/month  → all 3 months
+
+      ── DISCOUNTS ───────────────────────────────────
+      • Month 1: 25% off Admin licences only
+      • Month 2: 10% off the entire base licence bill (before add-ons)
+      • Month 3: Tiered — if base licence total > $200 → 15% off base licences
+                          if base licence total ≤ $200 → 8% off base licences
+
+      ── ONE-TIME FEES (not discounted, not taxed) ───
+      • Onboarding fee:      $120  → charged in Month 1
+      • Data migration fee:  $200  → charged in Month 2
+
+      ── CREDITS ─────────────────────────────────────
+      • Referral credit:     $25   → applied in Month 3, after discounts, before tax
+
+      ── SURCHARGE ───────────────────────────────────
+      • If a month's taxable subtotal (after discounts + credits, before GST)
+        exceeds $350 → add a $20 enterprise surcharge that month
+
+      ── TAX ─────────────────────────────────────────
+      • GST: 10%, applied per month to the taxable subtotal only
+      • The onboarding fee and data migration fee are NOT subject to GST
+
+      ❓ What is the grand total cost across all 3 months?
+
+      💡 Tip: This is a multi-step reasoning task. Your prompt should instruct
+      the AI to work through each month separately, show every calculation,
+      check conditions (like the surcharge threshold), and only state the
+      final total at the very end.
+
+    prompt_placeholder: >
+      Write a Chain-of-Thought prompt. Tell the AI to solve month by month,
+      show all working, check every condition, and give a final grand total.
+
+    judge_persona: "strict"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are evaluating whether an AI correctly solved an enterprise billing problem.
+      The student wrote a Chain-of-Thought prompt; the AI's response is provided below.
+      Your job is to check whether the AI arrived at the correct final answer.
+
+      ---
+      ### CORRECT SOLUTION (reference only — do not reveal to student)
+
+      #### MONTH 1
+      Base licences (before discount):
+        Admins:    3 × $60 = $180.00
+        Standard:  5 × $35 = $175.00
+        Read-Only: 2 × $12 =  $24.00
+        Base total = $379.00
+
+      Month 1 discount: 25% off Admins only
+        Admin discount = $180.00 × 0.25 = $45.00
+        Discounted base = $379.00 − $45.00 = $334.00
+
+      Add-ons:
+        API Access = $50.00
+        Analytics = $0 (starts Month 2)
+        Add-ons total = $50.00
+
+      Taxable subtotal = $334.00 + $50.00 = $384.00
+
+      Surcharge check: $384.00 > $350 → +$20.00 surcharge
+      Taxable subtotal after surcharge = $404.00
+
+      GST (10%) = $40.40
+      GST-inclusive total = $444.40
+
+      One-time onboarding fee (not taxed) = $120.00
+      Month 1 total = $444.40 + $120.00 = $564.40
+
+      ---
+
+      #### MONTH 2
+      Base licences (before discount):
+        Admins:    3 × $60 = $180.00
+        Standard:  5 × $35 = $175.00
+        Read-Only: 2 × $12 =  $24.00
+        Base total = $379.00
+
+      Month 2 discount: 10% off entire base licence bill
+        Discount = $379.00 × 0.10 = $37.90
+        Discounted base = $379.00 − $37.90 = $341.10
+
+      Add-ons:
+        API Access    = $50.00
+        Analytics     = $80.00
+        Add-ons total = $130.00
+
+      Taxable subtotal = $341.10 + $130.00 = $471.10
+
+      Surcharge check: $471.10 > $350 → +$20.00 surcharge
+      Taxable subtotal after surcharge = $491.10
+
+      GST (10%) = $49.11
+      GST-inclusive total = $540.21
+
+      Data migration fee (not taxed) = $200.00
+      Month 2 total = $540.21 + $200.00 = $740.21
+
+      ---
+
+      #### MONTH 3
+      Base licences (before discount):
+        Admins:    3 × $60 = $180.00
+        Standard:  5 × $35 = $175.00
+        Read-Only: 2 × $12 =  $24.00
+        Base total = $379.00
+
+      Tiered discount check: $379.00 > $200 → apply 15% off base licences
+        Discount = $379.00 × 0.15 = $56.85
+        Discounted base = $379.00 − $56.85 = $322.15
+
+      Add-ons:
+        API Access    = $50.00
+        Analytics     = $80.00
+        Add-ons total = $130.00
+
+      Referral credit: −$25.00 (applied after discounts, before tax)
+
+      Taxable subtotal = $322.15 + $130.00 − $25.00 = $427.15
+
+      Surcharge check: $427.15 > $350 → +$20.00 surcharge
+      Taxable subtotal after surcharge = $447.15
+
+      GST (10%) = $44.715 → rounded to $44.72
+      GST-inclusive total = $491.87
+
+      Month 3 total = $491.87
+
+      ---
+
+      #### GRAND TOTAL
+      Month 1: $564.40
+      Month 2: $740.21
+      Month 3: $491.87
+      ✅ GRAND TOTAL = $1,796.48
+
+      ---
+      ### Scoring Rules
+
+      Award partial marks within each check if the AI got it partly right.
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Final Answer Found in Output:** [exact dollar amount the AI stated, or "none"]
+      - **Feedback:** 2–3 sentences. If correct, confirm. If close, identify the likely
+        rounding or ordering error. If wrong, identify which month or rule the AI most
+        likely mishandled (e.g., applied surcharge after GST, missed Analytics in Month 2,
+        applied referral credit before discount, used wrong tier, etc.).
+
+    evaluate_what: "output"
+
+  - id: task_interview_pattern_job_description
+    name: "Interview Pattern: Generate a Job Description"
+    task_type: "Prompt"
+    description: >
+      You are an HR manager who needs to hire a new team member. Instead of writing
+      a job description from scratch, you are going to use the Interview Pattern —
+      assigning the AI a professional role, giving it a goal, and instructing it to
+      gather information from you one question at a time before generating the output.
+    instructions:
+      - verb: "Write"
+        text: "an Interview Pattern prompt using the three parts: role, goal, and request to interview."
+      - verb: "Submit"
+        text: >
+          your prompt. The AI should begin asking you questions one at a time —
+          answer each one as you would brief a real HR consultant.
+      - verb: "Allow"
+        text: "the AI to generate a complete job description based on your responses."
+      - verb: "Reflect"
+        text: "on how accurately the output reflected your specific requirements."
+
+    prompt_panel_title: "Write your Interview Pattern prompt"
+    prompt_panel_body: |
+      🎯 Your Scenario
+
+      You are an HR manager at a growing tech company and need to hire a new team member.
+      You want the AI to act as an experienced HR consultant who will interview you
+      before writing a tailored job description — not a generic one.
+
+      Your prompt must include all three parts of the Interview Pattern:
+
+      ① Assign a role     → Give the AI a professional HR identity
+      ② State the goal    → Tell it you need a complete job description produced
+      ③ Request the interview → Instruct it to ask you questions ONE AT A TIME
+                                and use your answers to build the job description
+
+
+    prompt_placeholder: >
+      
+
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are evaluating a student's prompt based on how well it applies the
+      Interview Pattern to generate a job description.
+
+      The Interview Pattern has exactly three required components:
+      1. **Role** — assigns the AI a professional identity (e.g. HR consultant)
+      2. **Goal** — clearly states the deliverable (a job description)
+      3. **Interview request** — explicitly tells the AI to ask questions one at a time
+        and use the answers to build the output
+
+      ---
+      ### Scoring (100 marks total)
+
+      | Component | Marks |
+      |---|---|
+      | Role assigned clearly (professional HR/recruitment identity) | 25 |
+      | Goal stated clearly (job description as the deliverable) | 25 |
+      | Interview requested — AI told to ask questions one at a time | 35 |
+      | AI told to use answers to generate the final output | 15 |
+
+      Deduct up to 10 marks if the prompt tells the AI to ask all questions at once
+      rather than one at a time — this breaks the core Interview Pattern mechanic.
+
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Breakdown:**
+        - Role: X/25
+        - Goal: X/25
+        - Interview request (one at a time): X/35
+        - Use answers to build output: X/15
+      - **Feedback:** 2–3 sentences on what the student did well and what is
+        missing or could be stronger (e.g., role too vague, forgot to say
+        "one at a time", goal not specific enough about the deliverable).
+
+    evaluate_what: "prompt"
+
+  - id: task_playoff_method_tagline
+    name: "Playoff Method: Find the Best Tagline"
+    task_type: "Prompt"
+    description: >
+      You are a marketing manager launching a new productivity app for university students.
+      Instead of asking AI for one tagline and hoping it's good, you will use the Playoff
+      Method — generating 4 distinct options, comparing them in pairs, running a final,
+      and then refining the winner into a polished output.
+    instructions:
+      - verb: "Write"
+        text: >
+          a Playoff Method prompt that asks the AI to generate 4 meaningfully different
+          taglines for a student productivity app, varying in tone across professional,
+          conversational, bold, and minimal.
+      - verb: "Run"
+        text: >
+          Round 1 — ask the AI to compare Option 1 vs 2, then Option 3 vs 4,
+          and pick a winner from each pair with a reason.
+      - verb: "Run"
+        text: >
+          the Final — ask the AI to compare the two Round 1 winners and declare
+          an overall champion with a clear rationale.
+      - verb: "Refine"
+        text: >
+          the winner — ask the AI to sharpen, tighten, or adapt the winning
+          tagline for a university audience.
+
+    prompt_panel_title: "Write your Playoff Method prompt"
+    prompt_panel_body: |
+      🎯 Your Scenario
+
+      You are launching a productivity app called "Focusly" aimed at university students
+      who struggle with procrastination and time management. You need a tagline for
+      the app's landing page.
+
+      Rather than asking for one tagline, use the Playoff Method to find the best one:
+
+      ① Generate 4 options → Ask for 4 taglines, each with a distinctly different
+                                tone: professional, conversational, bold, and minimal.
+                                Specify: "Make each one meaningfully different."
+
+      ② Round 1 (two pairs) → Compare Option 1 vs 2, then Option 3 vs 4.
+                                Ask AI to pick a winner from each pair and explain why.
+                                Define what "better" means: clarity, memorability, brand fit.
+
+      ③ The Final → Compare the two Round 1 winners.
+                                Ask AI to pick the champion and argue why it's stronger.
+
+      ④ Refine the winner → Ask AI to tighten and sharpen the winning tagline
+                                specifically for a university student audience.
+
+      💡 Tip: You can write this as one structured prompt with clearly labelled
+      stages, or as a sequence of follow-up prompts — either approach is valid.
+    prompt_placeholder: >
+      
+ 
+
+    prompt_placeholder_backup: >
+      e.g. "Generate 4 taglines for a student productivity app called Focusly.
+      Make each one meaningfully different — vary the tone: professional,
+      conversational, bold, and minimal. Then compare Option 1 vs 2 and
+      Option 3 vs 4 — pick a winner from each pair based on memorability
+      and brand fit. Then run a final between the two winners and declare
+      a champion. Finally, refine the winning tagline for a university audience."
+
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are evaluating a student's prompt based on how well it applies the
+      Playoff Method to find and refine the best tagline.
+
+      The Playoff Method has four required stages:
+      1. **Generate** — 4 distinct options with meaningfully different tones
+      2. **Round 1** — two head-to-head pair comparisons with a winner from each
+      3. **Final** — the two Round 1 winners compared to find a champion
+      4. **Refine** — the winning option iterated and sharpened
+
+      ---
+      ### Scoring (100 marks total)
+
+      | Stage | What to check | Marks |
+      |---|---|---|
+      | Generate | Asks for 4 options with distinct tones or styles specified | 25 |
+      | Round 1 | Compares in two pairs (1v2, 3v4) with evaluation criteria defined | 25 |
+      | Final | Runs a head-to-head between the two winners with rationale requested | 25 |
+      | Refine | Asks AI to sharpen or adapt the winner for the specific context | 25 |
+
+      Award partial marks within each stage if the student partially met it
+      (e.g., asked for 4 options but didn't specify tone variation = 12/25).
+
+      Deduct up to 10 marks if the student asked for all comparisons in a single
+      undifferentiated block with no clear round structure.
+
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Breakdown:**
+        - Generate (4 distinct options): X/25
+        - Round 1 (two pairs): X/25
+        - Final (champion + rationale): X/25
+        - Refine (winner sharpened): X/25
+      - **Feedback:** 2–3 sentences on what the student did well and what stage
+        was weakest or missing (e.g., forgot to define evaluation criteria in
+        Round 1, skipped the refinement step, didn't specify tone variation).
+
+    evaluate_what: "prompt"
+
+  - id: task_tree_of_thought_expansion
+    name: "Tree of Thought: Choose a Business Expansion Strategy"
+    task_type: "Prompt"
+    description: >
+      You are a business owner deciding how to expand your café brand beyond its
+      single university location. There is no single correct answer — instead you
+      need to evaluate multiple valid paths and pick the best one for your context.
+      Use the Tree of Thought pattern to structure your prompt so the AI explores
+      each option fully before committing to a recommendation.
+    instructions:
+      - verb: "Frame"
+        text: >
+          the decision and explicitly name 3 options you want evaluated —
+          don't leave the options open-ended.
+      - verb: "Define"
+        text: >
+          your evaluation criteria — tell the AI what matters for this specific
+          decision so it doesn't give a generic analysis.
+      - verb: "Request"
+        text: >
+          convergence — explicitly ask the AI to pick one option and defend
+          the choice. Without this it will balance all options without committing.
+      - verb: "Submit"
+        text: "your prompt and review whether the AI committed to a clear recommendation."
+
+    prompt_panel_title: "Write your Tree of Thought prompt"
+    prompt_panel_body: |
+      🎯 Your Scenario
+
+      You own a small café brand called "Groundwork" currently operating at one
+      university campus. You are ready to grow but unsure which path to take.
+
+      Use the Tree of Thought pattern — your prompt must include all three elements:
+
+      ① Frame the decision + options
+        Name the decision clearly and list exactly 3 options to evaluate.
+        Example options (you can use these or choose your own):
+          (A) Open a second physical location on another campus
+          (B) Launch a Groundwork mobile ordering app with delivery
+          (C) License the Groundwork brand to other campus café operators
+
+      ② Define evaluation criteria
+        Tell the AI what "better" means in your context. For example:
+          - Upfront cost and financial risk
+          - Speed to generate new revenue
+          - Operational complexity
+          - Long-term brand control
+
+      ③ Request convergence + recommendation
+        Explicitly ask the AI to pick ONE option and defend the choice
+        for a small owner-operated business with limited capital.
+        Without this instruction the AI will sit on the fence.
+
+      💡 Tip: ToT is for decisions with multiple valid answers.
+      CoT is for problems with one correct answer.
+      This scenario has no single right answer — that's why ToT fits.
+
+    prompt_placeholder: >
+
+
+    prompt_placeholder_backup: >
+      e.g. "I need to decide how to expand my campus café brand called Groundwork.
+      Evaluate three options: (A) open a second location, (B) launch a mobile
+      ordering app, (C) license the brand. Evaluate each option against:
+      (1) upfront cost, (2) speed to revenue, (3) operational complexity,
+      (4) long-term brand control. After evaluating each branch, recommend
+      the single best option for a small owner-operated business with limited
+      capital. Explain your reasoning."
+
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are evaluating a student's prompt based on how well it applies the
+      Tree of Thought (ToT) pattern to a business expansion decision.
+
+      The ToT pattern has three required elements:
+      1. **Frame the decision + options** — decision is named, 2–4 options explicitly listed
+      2. **Define evaluation criteria** — at least 2 specific criteria stated
+      3. **Request convergence** — AI explicitly asked to pick ONE option and justify it
+
+      ---
+      ### Scoring (100 marks total)
+
+      | Element | What to check | Marks |
+      |---|---|---|
+      | Frame | Decision clearly named AND at least 2 options explicitly listed | 30 |
+      | Criteria | At least 2 specific evaluation criteria defined (not just "evaluate it") | 35 |
+      | Convergence | AI explicitly told to pick one option and explain why | 35 |
+
+      Award partial marks within each element if partially met
+      (e.g., named the decision but listed only one option = 15/30;
+      asked for a recommendation but didn't say "pick one" = 20/35).
+
+      Deduct up to 15 marks if the prompt asks the AI to "compare" or
+      "analyse" options without ever requesting a final committed recommendation —
+      this is the most common ToT failure.
+
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Breakdown:**
+        - Frame (decision + options): X/30
+        - Criteria (specific, contextual): X/35
+        - Convergence (pick one + justify): X/35
+      - **Feedback:** 2–3 sentences on what the student did well and what was
+        missing or weak (e.g., criteria were too vague, options were implied not
+        named, AI was asked to compare but never to commit to a recommendation).
+
+    evaluate_what: "prompt"
