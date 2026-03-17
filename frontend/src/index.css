@@ -722,6 +722,25 @@ label {
   color: var(--ink);
 }
 
+/* ─── Chat markdown ───────────────────────────────────────────────────────── */
+.chat-md :where(p, ul, ol, blockquote, pre) { margin: 0; }
+.chat-md :where(ul, ol) { padding-left: 1.1rem; }
+.chat-md :where(li) { margin: .15rem 0; }
+.chat-md :where(strong) { font-weight: 700; }
+.chat-md :where(code) {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: .86em;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.chat-md :where(pre code) {
+  display: block;
+  padding: .6rem .7rem;
+  overflow-x: auto;
+}
+
 /* ─── Leaderboard (full page & mini) ─────────────────────────────────────── */
 .stats-row {
   display: grid;

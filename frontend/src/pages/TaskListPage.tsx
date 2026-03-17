@@ -165,7 +165,7 @@ export default function TaskListPage() {
                     <span className={`badge ${BADGE_COLORS[idx % BADGE_COLORS.length]}`}>
                       Activity {idx + 1}
                     </span>
-                    <span className="act-tag">Document extraction · Prompt engineering</span>
+                    <span className="act-tag">Prompt engineering</span>
                   </div>
                   <span className="pts-chip">+100 pts</span>
                 </div>

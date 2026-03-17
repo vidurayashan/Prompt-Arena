@@ -1276,4 +1276,167 @@ tasks:
 
       ### Notes
       - If the prompt is incomplete or does not match the task, give a low score and explain why.
-    evaluate_what: "output"
+    evaluate_what: "prompt"
+
+  - id: task_customer_email_emotion
+    name: "Identify the Emotion in a Customer Email"
+    task_type: "Prompt"
+    description: >
+      A customer has sent an email to the university café after a recent experience.
+      Your job is to write a prompt that instructs an AI to read the email and identify
+      the customer's emotion — including the primary emotion, its intensity, and a brief
+      explanation of what in the email signals that emotion.
+    instructions:
+      - verb: "Read"
+        text: "the customer email below carefully."
+      - verb: "Copy"
+        text: "the email text and paste it into your prompt."
+      - verb: "Write"
+        text: "a prompt that instructs the AI to identify the emotion expressed in the email."
+      - verb: "Submit"
+        text: "your prompt and review the feedback."
+    prompt_panel_title: "Write your prompt"
+    prompt_panel_body: |
+      Subject: Absolutely Disgusted with Today's Service
+
+      To Whom It May Concern,
+
+      I am writing to express how deeply upset I was by my experience at the university café
+      this afternoon. I waited in line for over 20 minutes, only to be told that the item
+      I had been looking forward to all day was sold out — again. This is not the first time
+      this has happened, and frankly, I am starting to feel like my time and money mean
+      nothing to this café.
+
+      On top of that, when I asked the staff member if there was an alternative, I was
+      dismissed with a shrug and told to "check back tomorrow." That response was
+      completely unacceptable. I am a paying student and I deserve to be treated with
+      basic respect.
+
+      I genuinely used to enjoy coming here between lectures, but right now I am struggling
+      to find a reason to return. I sincerely hope the management takes this feedback
+      seriously and makes meaningful changes — because right now, the experience is simply
+      not good enough.
+
+      Regards,
+      Alex
+
+      Write a prompt asking the AI to identify the emotion, its intensity, and what signals it in the email.
+
+    prompt_placeholder: >
+      Paste the email here and write a prompt asking the AI to identify the emotion, its intensity,
+      and what signals it in the email. Remember: Reading Task = Long Input → Short Output.
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are an evaluator assessing the quality of a student's prompt.
+      ---
+      ### Context
+      The student's task is to write a prompt that instructs an AI to:
+      1. Read a provided customer email.
+      2. Identify the **primary emotion** expressed in the email.
+      3. Optionally assess the **intensity** of the emotion and **explain what signals** it.
+
+      The student is expected to **paste the customer email into their prompt** and then
+      write instructions directing the AI on what to do with it.
+      ---
+      ### Your Task
+      Evaluate the student's prompt and assign a score out of **100 marks** based on the
+      criteria below.
+      ---
+      ### Marking Criteria (Total = 100 marks)
+
+      #### 1. Clarity (25 marks)
+      - Is the prompt clear and easy to understand?
+      - Does it unambiguously instruct the AI to identify emotion(s)?
+
+      #### 2. Task Alignment (25 marks)
+      - Does the prompt include the customer email (pasted in)?
+      - Does it ask the AI to identify at least the **primary emotion** in the email?
+
+      #### 3. Specificity (25 marks)
+      - Does the prompt ask for additional detail beyond just naming the emotion
+        (e.g., intensity, textual evidence, tone analysis)?
+      - Does it guide the AI with useful context about the purpose or audience?
+
+      #### 4. Prompt Quality (25 marks)
+      - Is the prompt well-structured and effective for an LLM?
+      - Does it encourage a nuanced, insightful response rather than a one-word answer?
+      ---
+      ### Output Format
+      - **Score:** X/100
+      - **Breakdown:**
+        - Clarity: X/25
+        - Task Alignment: X/25
+        - Specificity: X/25
+        - Prompt Quality: X/25
+      - **Feedback:** 2–3 sentences explaining strengths and areas for improvement.
+      ---
+      ### Notes
+      - If the student did **not** include the email in their prompt, deduct heavily from
+        Task Alignment (max 5/25 for that criterion).
+      - If the prompt only asks "what emotion is this?" with no email and no detail,
+        score it no higher than 30/100.
+      - If the prompt is completely off-task or blank, score 0 and explain why.
+    evaluate_what: "prompt"
+
+  - id: chat_snack_cafe_social_media
+    name: "Chat: Snack Café Social Media Strategy"
+    task_type: "Chat"
+    description: >
+      I'm thinking about the Snack Café's social media strategy. Help me think through the decision.
+      Start by asking me what you need to know.
+    judge_persona: "generous"
+    judge_prompt: |
+      ### LLM Judge Prompt
+      You are an evaluator assessing the quality of a student's multi-turn chat conversation with an AI assistant.
+      
+      ---
+      ### Context
+      The student is planning the Snack Café's social media strategy. A good conversation should clarify goals,
+      audience, brand tone, platform choices, content ideas, cadence, and constraints (time, budget, approvals).
+      
+      You will be given the full chat transcript with lines beginning with:
+      - STUDENT: ...
+      - ASSISTANT: ...
+      
+      ---
+      ### Your Task
+      Evaluate the overall quality of the conversation and assign a score out of **100 marks** based on the criteria below.
+      
+      ---
+      ### Marking Criteria (Total = 100 marks)
+      
+      #### 1. Discovery_and_context (25 marks)
+      - Does the conversation surface the right context (goals, target audience, platforms, constraints)?
+      - Does the student respond with relevant details and clarify assumptions when needed?
+      
+      #### 2. Strategy_quality (25 marks)
+      - Are platform choices and content pillars sensible for a university café?
+      - Does it include concrete content ideas and a posting cadence that fits the context?
+      
+      #### 3. Practicality (25 marks)
+      - Are the recommended actions feasible (time/budget/staff constraints)?
+      - Does it include measurable next steps (e.g., 2-week plan, KPIs, what to test)?
+      
+      #### 4. Communication (25 marks)
+      - Is the student's communication clear, structured, and goal-oriented?
+      - Does the student ask useful follow-up questions and keep the discussion on track?
+      
+      ---
+      ### Output Format (MANDATORY)
+      Respond with ONLY a JSON object in this exact shape (no markdown, no extra text):
+      {
+        "total": <int 0-100>,
+        "breakdown": {
+          "Discovery_and_context": {"score": <int>, "max": 25},
+          "Strategy_quality": {"score": <int>, "max": 25},
+          "Practicality": {"score": <int>, "max": 25},
+          "Communication": {"score": <int>, "max": 25}
+        },
+        "feedback": "<2-3 sentences on strengths and improvements>"
+      }
+      
+      ---
+      ### Notes
+      - If the transcript is extremely short (e.g., only 1 student message), cap total at 40.
+      - If the student is off-topic or does not engage meaningfully, score low and explain why.

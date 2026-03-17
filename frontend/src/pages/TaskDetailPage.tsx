@@ -4,6 +4,8 @@ import { api } from "../api";
 import type { ChatMessage, LeaderboardEntry, SubmissionAttempt, SubmitResponse, TaskDetail } from "../api";
 import Navbar from "../components/Navbar";
 import ScoreDisplay from "../components/ScoreDisplay";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type Stage = "idle" | "submitting" | "done";
 
@@ -223,7 +225,7 @@ export default function TaskDetailPage() {
         {!isChatTask && (
           <div className="card mb-2">
             <h2>{task.prompt_panel_title ?? "Write your prompt"}</h2>
-            <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem" }}>
+            <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", whiteSpace: "pre-wrap" }}>
               {task.prompt_panel_body ??
                 "The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output."}
             </p>
@@ -309,7 +311,11 @@ export default function TaskDetailPage() {
                     >
                       {m.role === "student" ? "You" : "AI"}
                     </div>
-                    <div>{m.content}</div>
+                    <div className="chat-md">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {m.content}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </div>
               ))}
