@@ -4,6 +4,7 @@ export interface Task {
   id: string;
   name: string;
   description: string;
+  instructions?: { verb: string; text: string }[];
 }
 
 export interface TaskItem {
@@ -12,10 +13,22 @@ export interface TaskItem {
 }
 
 export interface TaskDetail extends Task {
-  document_filename: string;
+  task_type: "Document" | "Prompt" | "Chat";
+  document_filename?: string;
   task_model: string;
   judge_persona: string;
-  items: TaskItem[];
+  items?: TaskItem[];
+  judge_prompt?: string;
+  evaluate_what?: "prompt" | "output";
+  prompt_intro?: string;
+  prompt_panel_title?: string;
+  prompt_panel_body?: string;
+  prompt_placeholder?: string;
+}
+
+export interface ChatMessage {
+  role: "student" | "assistant";
+  content: string;
 }
 
 export interface ScoreItem {
@@ -33,6 +46,8 @@ export interface SubmitResponse {
   total: number;
   previous_best: number | null;
   is_new_best: boolean;
+  judge_breakdown?: Record<string, { score: number; max: number }> | null;
+  judge_feedback?: string | null;
 }
 
 export interface LeaderboardEntry {
@@ -92,6 +107,18 @@ export const api = {
     apiFetch<SubmitResponse>(`/api/tasks/${taskId}/submit`, {
       method: "POST",
       body: JSON.stringify({ student_name: studentName, prompt }),
+    }),
+
+  chatSendMessage: (taskId: string, studentName: string, message: string, history: ChatMessage[]) =>
+    apiFetch<{ assistant_message: string }>(`/api/tasks/${taskId}/chat/message`, {
+      method: "POST",
+      body: JSON.stringify({ student_name: studentName, message, history }),
+    }),
+
+  chatScore: (taskId: string, studentName: string, history: ChatMessage[]) =>
+    apiFetch<SubmitResponse>(`/api/tasks/${taskId}/chat/score`, {
+      method: "POST",
+      body: JSON.stringify({ student_name: studentName, history }),
     }),
 
   getLeaderboard: (taskId: string) =>

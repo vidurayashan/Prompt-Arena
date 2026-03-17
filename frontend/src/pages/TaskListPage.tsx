@@ -17,7 +17,7 @@ const HERO_PILLS = [
 
 const BADGE_COLORS = ["b-red", "b-purple", "b-teal", "b-amber", "b-blue", "b-green", "b-purple"];
 
-const ACTIVITY_STEPS = [
+const DEFAULT_ACTIVITY_STEPS = [
   { verb: "Download", text: "the reference document and read it carefully." },
   { verb: "Write", text: "a prompt that instructs the AI to extract the required information." },
   { verb: "Submit", text: "and see how you score on the live leaderboard." },
@@ -177,7 +177,7 @@ export default function TaskListPage() {
                 </div>
 
                 <div className="act-tasks">
-                  {ACTIVITY_STEPS.map((step, i) => (
+                  {(task.instructions ?? DEFAULT_ACTIVITY_STEPS).map((step, i) => (
                     <div key={i} className="act-task">
                       <span className="task-num">{i + 1}</span>
                       <span>
