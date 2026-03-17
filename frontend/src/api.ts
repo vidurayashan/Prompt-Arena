@@ -73,6 +73,13 @@ export interface StudentPromptEntry {
   submitted_at: string;
 }
 
+export interface MasterLeaderboardEntry {
+  student_name: string;
+  total_points: number;
+  tasks_completed: number;
+  last_submitted: string;
+}
+
 export interface GetStudentPromptsParams {
   taskId?: string;
   student?: string;
@@ -138,4 +145,7 @@ export const api = {
     const q = sp.toString();
     return apiFetch<StudentPromptEntry[]>(`/api/student-prompts${q ? `?${q}` : ""}`);
   },
+
+  getMasterLeaderboard: (limit: number = 50) =>
+    apiFetch<MasterLeaderboardEntry[]>(`/api/master-leaderboard?limit=${encodeURIComponent(String(limit))}`),
 };

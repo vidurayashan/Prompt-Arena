@@ -1,6 +1,8 @@
 """Prompt Arena – FastAPI backend."""
 
+from datetime import datetime, timezone
 from pathlib import Path
+import re
 from typing import Any
 
 import os
@@ -99,6 +101,66 @@ class SubmitResponse(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
+_TZ_HH_ONLY_RE = re.compile(r"([+-])(\d{2})$")
+_TZ_HHMM_RE = re.compile(r"([+-])(\d{2})(\d{2})$")
+
+
+def _parse_data_cutoff_after(raw: Any) -> datetime | None:
+    """
+    Parse config `data_cutoff_after` into a timezone-aware datetime.
+
+    Accepts:
+    - ISO 8601 with offset, e.g. 2026-03-18T10:00:00+11:00
+    - 'Z' suffix, e.g. 2026-03-18T00:00:00Z
+    - Postgres-like timestamptz strings, e.g. 2026-03-08 18:10:24.805457+00
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise ValueError("data_cutoff_after must be a string timestamp or empty")
+
+    s = raw.strip()
+    if not s:
+        return None
+
+    # Normalize common variants to something datetime.fromisoformat can parse.
+    s = s.replace("Z", "+00:00")
+    s = _TZ_HH_ONLY_RE.sub(r"\1\2:00", s)     # +00 -> +00:00
+    s = _TZ_HHMM_RE.sub(r"\1\2:\3", s)        # +1100 -> +11:00
+
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        # Fallback for cases fromisoformat still rejects.
+        for fmt in (
+            "%Y-%m-%d %H:%M:%S.%f%z",
+            "%Y-%m-%d %H:%M:%S%z",
+            "%Y-%m-%dT%H:%M:%S.%f%z",
+            "%Y-%m-%dT%H:%M:%S%z",
+        ):
+            try:
+                dt = datetime.strptime(s, fmt)
+                break
+            except ValueError:
+                dt = None  # type: ignore[assignment]
+        if dt is None:
+            raise
+
+    # Ensure tz-aware (avoid server-local ambiguity if user supplied naive time).
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _data_cutoff_since(cfg: dict[str, Any]) -> datetime | None:
+    raw = cfg.get("data_cutoff_after")
+    if raw in (None, "", "null"):
+        return None
+    try:
+        return _parse_data_cutoff_after(raw)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Invalid config data_cutoff_after: {exc}")
+
 
 def _safe_task(task_id: str) -> dict[str, Any]:
     task = config_loader.get_task(task_id)
@@ -157,6 +219,13 @@ def login(body: LoginRequest) -> LoginResponse:
     name = body.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Name cannot be empty")
+    # Frontend sends a displayName like: "First (12345678)"
+    # Enforce a numeric Student ID even if the UI is bypassed.
+    if not re.fullmatch(r".+\(\d+\)", name):
+        raise HTTPException(
+            status_code=400,
+            detail="Student ID must be numbers only.",
+        )
     return LoginResponse(name=name)
 
 
@@ -202,6 +271,7 @@ def download_document(task_id: str) -> FileResponse:
 def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     cfg = config_loader.get_config()
     task = _safe_task(task_id)
+    since = _data_cutoff_since(cfg)
 
     openai_key     = cfg.get("openai_api_key", "")
     openrouter_key = cfg.get("openrouter_api_key", "")
@@ -331,7 +401,7 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
 
     # Persist score
-    previous_best = leaderboard.get_student_best(body.student_name, task_id)
+    previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
     leaderboard.upsert_score(body.student_name, task_id, total_score, body.prompt)
     is_new_best = previous_best is None or total_score > previous_best
 
@@ -368,7 +438,9 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
 @app.get("/api/tasks/{task_id}/leaderboard")
 def get_leaderboard(task_id: str) -> list[dict[str, Any]]:
     _safe_task(task_id)
-    return leaderboard.get_leaderboard(task_id)
+    cfg = config_loader.get_config()
+    since = _data_cutoff_since(cfg)
+    return leaderboard.get_leaderboard(task_id, since=since)
 
 
 @app.get("/api/tasks/{task_id}/history")
@@ -377,7 +449,9 @@ def get_history(
     student: str = Query(..., description="Student name"),
 ) -> list[dict[str, Any]]:
     _safe_task(task_id)
-    return leaderboard.get_student_history(student, task_id)
+    cfg = config_loader.get_config()
+    since = _data_cutoff_since(cfg)
+    return leaderboard.get_student_history(student, task_id, since=since)
 
 
 @app.get("/api/student-prompts")
@@ -388,11 +462,14 @@ def get_student_prompts(
     offset: int = Query(0, ge=0),
 ) -> list[dict[str, Any]]:
     """List submitted prompts for the Student Prompts tab. Optional filters: task_id, student."""
+    cfg = config_loader.get_config()
+    since = _data_cutoff_since(cfg)
     rows = leaderboard.get_student_prompts(
         task_id=task_id,
         student_filter=student or None,
         limit=limit,
         offset=offset,
+        since=since,
     )
     result = []
     for row in rows:
@@ -405,6 +482,43 @@ def get_student_prompts(
             "prompt": row["prompt"],
             "score": row["score"],
             "submitted_at": row["submitted_at"].isoformat() if hasattr(row["submitted_at"], "isoformat") else str(row["submitted_at"]),
+        })
+    return result
+
+
+@app.get("/api/master-leaderboard")
+def get_master_leaderboard(
+    limit: int = Query(50, ge=1, le=200),
+) -> list[dict[str, Any]]:
+    cfg = config_loader.get_config()
+    since = _data_cutoff_since(cfg)
+
+    task_ids_raw = cfg.get("master_leaderboard_task_ids", [])
+    if task_ids_raw is None:
+        return []
+    if not isinstance(task_ids_raw, list) or any(not isinstance(x, str) for x in task_ids_raw):
+        raise HTTPException(status_code=500, detail="Invalid config master_leaderboard_task_ids: must be a list of strings")
+    task_ids = [x.strip() for x in task_ids_raw if x and x.strip()]
+    if not task_ids:
+        return []
+
+    # Validate task IDs exist in config.yaml (catch typos early)
+    known_ids = {t.get("id") for t in cfg.get("tasks", []) if isinstance(t, dict)}
+    unknown = [tid for tid in task_ids if tid not in known_ids]
+    if unknown:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unknown task IDs in master_leaderboard_task_ids: {', '.join(unknown)}",
+        )
+
+    rows = leaderboard.get_master_leaderboard(task_ids=task_ids, limit=limit, since=since)
+    result = []
+    for row in rows:
+        result.append({
+            "student_name": row["student_name"],
+            "total_points": int(row["total_points"]) if row.get("total_points") is not None else 0,
+            "tasks_completed": int(row["tasks_completed"]) if row.get("tasks_completed") is not None else 0,
+            "last_submitted": row["last_submitted"].isoformat() if hasattr(row.get("last_submitted"), "isoformat") else str(row.get("last_submitted")),
         })
     return result
 
@@ -453,6 +567,7 @@ def chat_message(task_id: str, body: ChatTurnRequest) -> dict[str, str]:
 def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
     cfg = config_loader.get_config()
     task = _safe_task(task_id)
+    since = _data_cutoff_since(cfg)
 
     if task.get("task_type") != "Chat":
         raise HTTPException(status_code=400, detail="This endpoint is only for Chat tasks")
@@ -490,7 +605,7 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
     total_score = max(0, min(100, total_score))
 
     # Persist using the transcript as the stored "prompt"
-    previous_best = leaderboard.get_student_best(body.student_name, task_id)
+    previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
     leaderboard.upsert_score(body.student_name, task_id, total_score, transcript)
     is_new_best = previous_best is None or total_score > previous_best
 

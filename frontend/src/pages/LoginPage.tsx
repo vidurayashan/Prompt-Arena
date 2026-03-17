@@ -39,6 +39,10 @@ export default function LoginPage() {
       setError("Please enter your student ID.");
       return;
     }
+    if (!/^\d+$/.test(studentId.trim())) {
+      setError("Student ID must be numbers only.");
+      return;
+    }
     setLoading(true);
     try {
       await api.login(displayName);
@@ -81,7 +85,9 @@ export default function LoginPage() {
               placeholder="e.g. 12345678"
               maxLength={12}
               value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
+              onChange={(e) => setStudentId(e.target.value.replace(/\D/g, ""))}
+              inputMode="numeric"
+              pattern="[0-9]*"
               autoComplete="off"
             />
           </div>

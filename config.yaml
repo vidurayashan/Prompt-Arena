@@ -20,6 +20,28 @@ judge_provider_base_url: ""
 # If unset or null, the provider default temperature is used.
 judge_temperature: 0.0
 
+# ---------------------------------------------------------------------------
+# Leaderboard / Student Prompts cutoff
+# ---------------------------------------------------------------------------
+# If set, leaderboard, Student Prompts, history, and "previous best" will only
+# include submissions with submitted_at >= this timestamp.
+# Use a timezone-aware timestamp (recommended), e.g.:
+#   data_cutoff_after: "2026-03-18T00:00:00+00:00"
+# Or a Postgres-style timestamptz string, e.g.:
+#   data_cutoff_after: "2026-03-08 18:10:24.805457+00"
+# Leave blank or remove to include all historical data.
+data_cutoff_after: "2026-03-17 13:00:24.805457+00"
+
+# Master leaderboard: sum of best scores across selected tasks
+master_leaderboard_task_ids:
+  - task_snack_brand_prompt
+  - task_customer_email_emotion
+  - chat_snack_cafe_social_media
+  - task_chain_of_thought_enterprise_billing
+  - task_interview_pattern_job_description
+  - task_playoff_method_tagline
+  - task_tree_of_thought_expansion
+
 # Global judge persona: "strict" or "generous"
 #   strict   - detailed partial-credit rubric; zeros for wrong figures or missing identifiers
 #   generous - full marks for correct core info regardless of phrasing; zeros only for

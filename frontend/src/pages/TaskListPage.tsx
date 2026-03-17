@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { StudentPromptEntry, Task } from "../api";
+import type { MasterLeaderboardEntry, StudentPromptEntry, Task } from "../api";
 import Navbar from "../components/Navbar";
 
 type Tab = "activities" | "leaderboard" | "prompts" | "users";
@@ -45,6 +45,9 @@ export default function TaskListPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("activities");
+  const [masterLb, setMasterLb] = useState<MasterLeaderboardEntry[]>([]);
+  const [masterLbLoading, setMasterLbLoading] = useState(false);
+  const [masterLbError, setMasterLbError] = useState("");
   const [prompts, setPrompts] = useState<StudentPromptEntry[]>([]);
   const [promptsLoading, setPromptsLoading] = useState(false);
   const [promptsError, setPromptsError] = useState("");
@@ -92,6 +95,22 @@ export default function TaskListPage() {
   useEffect(() => {
     if (activeTab === "prompts") fetchPrompts();
   }, [activeTab, fetchPrompts]);
+
+  const fetchMasterLeaderboard = useCallback(() => {
+    setMasterLbLoading(true);
+    setMasterLbError("");
+    api
+      .getMasterLeaderboard(50)
+      .then(setMasterLb)
+      .catch((err: unknown) =>
+        setMasterLbError(err instanceof Error ? err.message : "Failed to load master leaderboard")
+      )
+      .finally(() => setMasterLbLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "leaderboard") fetchMasterLeaderboard();
+  }, [activeTab, fetchMasterLeaderboard]);
 
   return (
     <>
@@ -218,6 +237,70 @@ export default function TaskListPage() {
                 ))}
               </div>
             )}
+
+            <div style={{ height: 18 }} />
+
+            <div className="lb-wrap" style={{ width: "min(980px, 100%)", margin: "0 auto" }}>
+              <div className="lb-head">
+                <h3>Master Leaderboard (total points)</h3>
+                <span>Sum of best scores across selected activities</span>
+              </div>
+
+              {masterLbLoading && <div className="spinner" />}
+              {masterLbError && <div className="error-msg">{masterLbError}</div>}
+
+              {!masterLbLoading && !masterLbError && masterLb.length === 0 && (
+                <div className="lb-empty">No in-class submissions yet (for the selected master activities).</div>
+              )}
+
+              {!masterLbLoading && !masterLbError && masterLb.length > 0 && (
+                <>
+                  {masterLb.map((entry, idx) => {
+                    const rank = idx + 1;
+                    const isMe = entry.student_name === studentName;
+                    return (
+                      <div
+                        key={entry.student_name}
+                        className={`lb-row${isMe ? " me" : ""}`}
+                      >
+                        <span className="lb-rank">{rank}</span>
+
+                        <div>
+                          <div className="lb-name">
+                            {entry.student_name}
+                            {isMe && (
+                              <span style={{
+                                marginLeft: ".4rem",
+                                fontSize: "10px",
+                                color: "var(--red)",
+                                fontWeight: 600,
+                                background: "var(--red-l)",
+                                padding: "1px 6px",
+                                borderRadius: "10px",
+                              }}>
+                                you
+                              </span>
+                            )}
+                          </div>
+                          <div className="lb-sub">{entry.tasks_completed} task{entry.tasks_completed !== 1 ? "s" : ""} completed</div>
+                        </div>
+
+                        <div className="lb-score">
+                          {entry.total_points}
+                          <span style={{ fontSize: "11px", color: "var(--ink4)", fontWeight: 400 }}>/700</span>
+                        </div>
+
+                        <div className="lb-acts" style={{ color: "var(--ink3)" }}>
+                          {new Date(entry.last_submitted).toLocaleString()}
+                        </div>
+
+                        <div className="lb-acts" />
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
           </div>
         )}
 
