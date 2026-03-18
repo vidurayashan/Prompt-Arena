@@ -80,6 +80,11 @@ export interface MasterLeaderboardEntry {
   last_submitted: string;
 }
 
+export interface LiveUser {
+  student_name: string;
+  last_seen: string;
+}
+
 export interface GetStudentPromptsParams {
   taskId?: string;
   student?: string;
@@ -148,4 +153,13 @@ export const api = {
 
   getMasterLeaderboard: (limit: number = 50) =>
     apiFetch<MasterLeaderboardEntry[]>(`/api/master-leaderboard?limit=${encodeURIComponent(String(limit))}`),
+
+  presencePing: (studentName: string) =>
+    apiFetch<{ ok: boolean }>("/api/presence/ping", {
+      method: "POST",
+      body: JSON.stringify({ student_name: studentName }),
+    }),
+
+  getLiveUsers: (activeWithinSeconds: number = 300) =>
+    apiFetch<LiveUser[]>(`/api/presence?active_within_seconds=${encodeURIComponent(String(activeWithinSeconds))}`),
 };

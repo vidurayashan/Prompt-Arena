@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 import re
+import threading
 from typing import Any
 
 import os
@@ -50,6 +51,10 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     name: str
+
+
+class PresencePingRequest(BaseModel):
+    student_name: str
 
 
 class SubmitRequest(BaseModel):
@@ -103,6 +108,33 @@ class SubmitResponse(BaseModel):
 
 _TZ_HH_ONLY_RE = re.compile(r"([+-])(\d{2})$")
 _TZ_HHMM_RE = re.compile(r"([+-])(\d{2})(\d{2})$")
+
+_STUDENT_NAME_RE = re.compile(r".+\(\d+\)$")
+
+# Presence registry (single-instance only). Map student_name -> last_seen_utc
+_presence_lock = threading.Lock()
+_presence_last_seen: dict[str, datetime] = {}
+
+
+def _validate_student_name(raw: Any) -> str:
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=400, detail="Student name must be a string.")
+    name = raw.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    # Frontend sends a displayName like: "First (12345678)"
+    # Enforce a numeric Student ID even if the UI is bypassed.
+    if not _STUDENT_NAME_RE.fullmatch(name):
+        raise HTTPException(status_code=400, detail="Student ID must be numbers only.")
+    return name
+
+
+def _prune_presence(now: datetime, active_within_seconds: int) -> None:
+    cutoff = now.timestamp() - active_within_seconds
+    stale = [name for name, seen in _presence_last_seen.items() if seen.timestamp() < cutoff]
+    for name in stale:
+        _presence_last_seen.pop(name, None)
+
 
 
 def _parse_data_cutoff_after(raw: Any) -> datetime | None:
@@ -216,17 +248,33 @@ def _public_task(task: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
 
 @app.post("/api/login", response_model=LoginResponse)
 def login(body: LoginRequest) -> LoginResponse:
-    name = body.name.strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Name cannot be empty")
-    # Frontend sends a displayName like: "First (12345678)"
-    # Enforce a numeric Student ID even if the UI is bypassed.
-    if not re.fullmatch(r".+\(\d+\)", name):
-        raise HTTPException(
-            status_code=400,
-            detail="Student ID must be numbers only.",
-        )
+    name = _validate_student_name(body.name)
     return LoginResponse(name=name)
+
+
+@app.post("/api/presence/ping")
+def presence_ping(body: PresencePingRequest) -> dict[str, bool]:
+    name = _validate_student_name(body.student_name)
+    now = datetime.now(timezone.utc)
+    with _presence_lock:
+        _presence_last_seen[name] = now
+        _prune_presence(now, active_within_seconds=300)
+    return {"ok": True}
+
+
+@app.get("/api/presence")
+def presence_list(
+    active_within_seconds: int = Query(300, ge=10, le=3600),
+) -> list[dict[str, str]]:
+    now = datetime.now(timezone.utc)
+    with _presence_lock:
+        _prune_presence(now, active_within_seconds=active_within_seconds)
+        rows = sorted(_presence_last_seen.items(), key=lambda kv: kv[1], reverse=True)
+    return [
+        {"student_name": name, "last_seen": seen.isoformat()}
+        for name, seen in rows
+        if (now - seen).total_seconds() <= active_within_seconds
+    ]
 
 
 @app.get("/api/tasks")

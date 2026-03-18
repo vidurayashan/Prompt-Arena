@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
-import type { MasterLeaderboardEntry, StudentPromptEntry, Task } from "../api";
+import type { LiveUser, MasterLeaderboardEntry, StudentPromptEntry, Task } from "../api";
 import Navbar from "../components/Navbar";
 
 type Tab = "activities" | "leaderboard" | "prompts" | "users";
@@ -55,6 +55,8 @@ export default function TaskListPage() {
   const [promptStudentFilter, setPromptStudentFilter] = useState("");
   const [promptSortBy, setPromptSortBy] = useState<"latest" | "score">("latest");
   const [promptExpandedKeys, setPromptExpandedKeys] = useState<Set<string>>(new Set());
+  const [liveUsers, setLiveUsers] = useState<LiveUser[]>([]);
+  const [liveUsersError, setLiveUsersError] = useState("");
   const navigate = useNavigate();
 
   function togglePromptExpanded(key: string) {
@@ -74,6 +76,50 @@ export default function TaskListPage() {
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Failed to load tasks"))
       .finally(() => setLoading(false));
   }, []);
+
+  // Live users: heartbeat + polling while on the Live Users tab
+  useEffect(() => {
+    if (!studentName) return;
+    let heartbeatId: number | undefined;
+    let pollId: number | undefined;
+    let stopped = false;
+
+    async function heartbeat() {
+      try {
+        await api.presencePing(studentName);
+      } catch {
+        // ignore heartbeat errors; presence is best-effort
+      }
+    }
+
+    async function fetchLive() {
+      try {
+        const users = await api.getLiveUsers(300);
+        if (!stopped) {
+          setLiveUsers(users);
+          setLiveUsersError("");
+        }
+      } catch (err) {
+        if (!stopped) {
+          setLiveUsersError(err instanceof Error ? err.message : "Failed to load live users");
+        }
+      }
+    }
+
+    if (activeTab === "users") {
+      // Kick off immediately so the user appears quickly
+      heartbeat();
+      fetchLive();
+      heartbeatId = window.setInterval(heartbeat, 20000);
+      pollId = window.setInterval(fetchLive, 5000);
+    }
+
+    return () => {
+      stopped = true;
+      if (heartbeatId !== undefined) window.clearInterval(heartbeatId);
+      if (pollId !== undefined) window.clearInterval(pollId);
+    };
+  }, [activeTab, studentName]);
 
   const fetchPrompts = useCallback(() => {
     setPromptsLoading(true);
@@ -409,31 +455,73 @@ export default function TaskListPage() {
           <div className="panel-placeholder">
             <h3>Live Users</h3>
             <p>See who else is in the workshop right now.</p>
-            {studentName && (
-              <div style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "8px",
-                background: "var(--green-l)",
-                border: "1px solid var(--green-b)",
-                borderRadius: "var(--r-sm)",
-                padding: "10px 16px",
-                marginTop: "1rem",
-              }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  background: "var(--green)", color: "white",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700,
-                }}>
-                  {studentName.slice(0, 2).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, color: "var(--green)", fontSize: 13 }}>{studentName}</div>
-                  <div style={{ fontSize: 11, color: "var(--teal)" }}>You are online</div>
-                </div>
+            {liveUsersError && <div className="error-msg">{liveUsersError}</div>}
+            <div style={{ marginTop: "1.2rem" }}>
+              <div style={{ fontSize: 13, color: "var(--ink3)", marginBottom: "0.4rem" }}>
+                <strong>{liveUsers.length}</strong> user{liveUsers.length === 1 ? "" : "s"} online in the last 5 minutes
               </div>
-            )}
+              {liveUsers.length === 0 && (
+                <div className="plog-empty">
+                  No one is currently online. As students join the workshop, they will appear here.
+                </div>
+              )}
+              {liveUsers.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+                  {liveUsers.map((u) => (
+                    <div
+                      key={u.student_name}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "var(--green-l)",
+                        border: "1px solid var(--green-b)",
+                        borderRadius: "var(--r-sm)",
+                        padding: "8px 14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: "50%",
+                          background: "var(--green)",
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        {u.student_name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "var(--green)", fontSize: 13 }}>
+                          {u.student_name}
+                          {u.student_name === studentName && (
+                            <span
+                              style={{
+                                marginLeft: ".4rem",
+                                fontSize: "10px",
+                                color: "var(--teal)",
+                                fontWeight: 600,
+                                background: "var(--teal-l)",
+                                padding: "1px 6px",
+                                borderRadius: "10px",
+                              }}
+                            >
+                              you
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--ink3)" }}>Online now</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
