@@ -30,7 +30,7 @@ judge_temperature: 0.0
 # Or a Postgres-style timestamptz string, e.g.:
 #   data_cutoff_after: "2026-03-08 18:10:24.805457+00"
 # Leave blank or remove to include all historical data.
-data_cutoff_after: "2026-03-17 13:00:24.805457+00"
+data_cutoff_after: "2026-03-18 23:00:24.805457+00"
 
 # Master leaderboard: sum of best scores across selected tasks
 master_leaderboard_task_ids:
