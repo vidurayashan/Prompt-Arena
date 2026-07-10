@@ -185,6 +185,143 @@ def get_student_prompts(
         con.close()
 
 
+def get_published_task_ids() -> set[str]:
+    """Return task IDs currently marked published. Missing table rows mean unpublished."""
+    con = _conn()
+    try:
+        with con.cursor() as cur:
+            cur.execute(
+                """
+                SELECT task_id
+                FROM   published_tasks
+                WHERE  published = TRUE
+                """
+            )
+            rows = cur.fetchall()
+        return {row[0] for row in rows}
+    finally:
+        con.close()
+
+
+def get_publish_flags() -> dict[str, bool]:
+    """Return task_id -> published for all rows in published_tasks."""
+    con = _conn()
+    try:
+        with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT task_id, published
+                FROM   published_tasks
+                """
+            )
+            rows = cur.fetchall()
+        return {row["task_id"]: bool(row["published"]) for row in rows}
+    finally:
+        con.close()
+
+
+def set_task_published(task_id: str, published: bool) -> None:
+    """Upsert the published flag for a task."""
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO published_tasks (task_id, published, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (task_id) DO UPDATE
+                    SET published = EXCLUDED.published,
+                        updated_at = NOW()
+                    """,
+                    (task_id, published),
+                )
+    finally:
+        con.close()
+
+
+def get_task_overrides(task_id: str) -> dict[str, Any]:
+    """Return sparse field overrides for one task (empty dict if none)."""
+    con = _conn()
+    try:
+        with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT overrides
+                FROM   task_overrides
+                WHERE  task_id = %s
+                """,
+                (task_id,),
+            )
+            row = cur.fetchone()
+        if not row or row.get("overrides") is None:
+            return {}
+        raw = row["overrides"]
+        return dict(raw) if isinstance(raw, dict) else {}
+    finally:
+        con.close()
+
+
+def get_all_task_overrides() -> dict[str, dict[str, Any]]:
+    """Return task_id -> overrides for all rows in task_overrides."""
+    con = _conn()
+    try:
+        with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT task_id, overrides
+                FROM   task_overrides
+                """
+            )
+            rows = cur.fetchall()
+        result: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            raw = row.get("overrides")
+            result[row["task_id"]] = dict(raw) if isinstance(raw, dict) else {}
+        return result
+    finally:
+        con.close()
+
+
+def set_task_overrides(task_id: str, overrides: dict[str, Any]) -> dict[str, Any]:
+    """Replace the full overrides object for a task. Empty dict deletes the row."""
+    if not overrides:
+        clear_task_overrides(task_id)
+        return {}
+
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO task_overrides (task_id, overrides, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (task_id) DO UPDATE
+                    SET overrides = EXCLUDED.overrides,
+                        updated_at = NOW()
+                    """,
+                    (task_id, psycopg2.extras.Json(overrides)),
+                )
+        return overrides
+    finally:
+        con.close()
+
+
+def clear_task_overrides(task_id: str) -> None:
+    """Remove all overrides for a task (fall back to config.yaml)."""
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM task_overrides WHERE task_id = %s",
+                    (task_id,),
+                )
+    finally:
+        con.close()
+
+
 def get_master_leaderboard(
     task_ids: list[str],
     limit: int = 50,

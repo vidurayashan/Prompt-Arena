@@ -1,10 +1,108 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api } from "../api";
-import type { LiveUser, MasterLeaderboardEntry, StudentPromptEntry, Task } from "../api";
+import { api, isAdminSession } from "../api";
+import type {
+  AdminTask,
+  LiveUser,
+  MasterLeaderboardEntry,
+  StudentPromptEntry,
+  Task,
+  TaskOverridesPayload,
+} from "../api";
 import Navbar from "../components/Navbar";
 
-type Tab = "activities" | "leaderboard" | "prompts" | "users";
+type Tab = "activities" | "leaderboard" | "prompts" | "users" | "workshop";
+
+type EditFormState = {
+  name: string;
+  description: string;
+  instructions: { verb: string; text: string }[];
+  prompt_intro: string;
+  prompt_panel_title: string;
+  prompt_panel_body: string;
+  prompt_placeholder: string;
+  judge_prompt: string;
+  pre_prompt_judge_prompt: string;
+  judge_persona: string;
+  evaluate_what: string;
+};
+
+function formFromTask(task: AdminTask): EditFormState {
+  return {
+    name: task.name ?? "",
+    description: task.description ?? "",
+    instructions: (task.instructions ?? []).map((s) => ({ verb: s.verb, text: s.text })),
+    prompt_intro: task.prompt_intro ?? "",
+    prompt_panel_title: task.prompt_panel_title ?? "",
+    prompt_panel_body: task.prompt_panel_body ?? "",
+    prompt_placeholder: task.prompt_placeholder ?? "",
+    judge_prompt: task.judge_prompt ?? "",
+    pre_prompt_judge_prompt: task.pre_prompt_judge_prompt ?? "",
+    judge_persona: task.judge_persona ?? "strict",
+    evaluate_what: task.evaluate_what ?? "prompt",
+  };
+}
+
+function buildOverridesPayload(form: EditFormState, taskType: string): TaskOverridesPayload {
+  const payload: TaskOverridesPayload = {
+    name: form.name.trim(),
+    description: form.description.trim(),
+    judge_persona: form.judge_persona,
+  };
+  const steps = form.instructions
+    .map((s) => ({ verb: s.verb.trim(), text: s.text.trim() }))
+    .filter((s) => s.verb || s.text);
+  if (steps.length > 0) payload.instructions = steps;
+
+  if (form.pre_prompt_judge_prompt.trim()) {
+    payload.pre_prompt_judge_prompt = form.pre_prompt_judge_prompt;
+  }
+
+  if (taskType === "Prompt" || taskType === "Chat") {
+    if (form.prompt_intro.trim()) payload.prompt_intro = form.prompt_intro;
+    if (form.prompt_panel_title.trim()) payload.prompt_panel_title = form.prompt_panel_title;
+    if (form.prompt_panel_body.trim()) payload.prompt_panel_body = form.prompt_panel_body;
+    if (form.prompt_placeholder.trim()) payload.prompt_placeholder = form.prompt_placeholder;
+    if (form.judge_prompt.trim()) payload.judge_prompt = form.judge_prompt;
+  }
+  if (taskType === "Prompt") {
+    payload.evaluate_what = form.evaluate_what;
+  }
+  return payload;
+}
+
+function applyOverrideResponse(task: AdminTask, res: {
+  name: string;
+  description: string;
+  overrides: Record<string, unknown>;
+  has_overrides: boolean;
+  instructions?: { verb: string; text: string }[] | null;
+  prompt_intro?: string | null;
+  prompt_panel_title?: string | null;
+  prompt_panel_body?: string | null;
+  prompt_placeholder?: string | null;
+  judge_prompt?: string | null;
+  pre_prompt_judge_prompt?: string | null;
+  judge_persona?: string | null;
+  evaluate_what?: string | null;
+}): AdminTask {
+  return {
+    ...task,
+    name: res.name,
+    description: res.description,
+    overrides: res.overrides,
+    has_overrides: res.has_overrides,
+    instructions: res.instructions ?? undefined,
+    prompt_intro: res.prompt_intro ?? undefined,
+    prompt_panel_title: res.prompt_panel_title ?? undefined,
+    prompt_panel_body: res.prompt_panel_body ?? undefined,
+    prompt_placeholder: res.prompt_placeholder ?? undefined,
+    judge_prompt: res.judge_prompt ?? undefined,
+    pre_prompt_judge_prompt: res.pre_prompt_judge_prompt ?? undefined,
+    judge_persona: res.judge_persona ?? undefined,
+    evaluate_what: res.evaluate_what ?? undefined,
+  };
+}
 
 const HERO_PILLS = [
   "Document extraction",
@@ -57,7 +155,15 @@ export default function TaskListPage() {
   const [promptExpandedKeys, setPromptExpandedKeys] = useState<Set<string>>(new Set());
   const [liveUsers, setLiveUsers] = useState<LiveUser[]>([]);
   const [liveUsersError, setLiveUsersError] = useState("");
+  const [adminTasks, setAdminTasks] = useState<AdminTask[]>([]);
+  const [adminTasksLoading, setAdminTasksLoading] = useState(false);
+  const [adminTasksError, setAdminTasksError] = useState("");
+  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<EditFormState | null>(null);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const isAdmin = isAdminSession();
 
   function togglePromptExpanded(key: string) {
     setPromptExpandedKeys((prev) => {
@@ -77,9 +183,97 @@ export default function TaskListPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const fetchAdminTasks = useCallback(() => {
+    if (!isAdmin) return;
+    setAdminTasksLoading(true);
+    setAdminTasksError("");
+    api
+      .getAdminTasks()
+      .then(setAdminTasks)
+      .catch((err: unknown) =>
+        setAdminTasksError(err instanceof Error ? err.message : "Failed to load workshop tasks")
+      )
+      .finally(() => setAdminTasksLoading(false));
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (activeTab === "workshop" && isAdmin) fetchAdminTasks();
+  }, [activeTab, isAdmin, fetchAdminTasks]);
+
+  useEffect(() => {
+    if (!isAdmin && (activeTab === "prompts" || activeTab === "workshop")) {
+      setActiveTab("activities");
+    }
+  }, [isAdmin, activeTab]);
+
+  async function handleTogglePublished(task: AdminTask) {
+    setTogglingTaskId(task.id);
+    setAdminTasksError("");
+    try {
+      const res = await api.setTaskPublished(task.id, !task.published);
+      setAdminTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? { ...t, published: res.published } : t))
+      );
+      // Refresh student-facing list so Activities tab stays in sync for the admin view
+      const published = await api.listTasks();
+      setTasks(published);
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to update publish state");
+    } finally {
+      setTogglingTaskId(null);
+    }
+  }
+
+  function openEditForm(task: AdminTask) {
+    if (editingTaskId === task.id) {
+      setEditingTaskId(null);
+      setEditForm(null);
+      return;
+    }
+    setEditingTaskId(task.id);
+    setEditForm(formFromTask(task));
+  }
+
+  async function handleSaveOverrides(task: AdminTask) {
+    if (!editForm) return;
+    setSavingTaskId(task.id);
+    setAdminTasksError("");
+    try {
+      const payload = buildOverridesPayload(editForm, task.task_type);
+      const res = await api.updateTaskOverrides(task.id, payload);
+      setAdminTasks((prev) =>
+        prev.map((t) => (t.id === task.id ? applyOverrideResponse(t, res) : t))
+      );
+      setEditForm(formFromTask(applyOverrideResponse(task, res)));
+      const published = await api.listTasks();
+      setTasks(published);
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to save overrides");
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
+  async function handleResetOverrides(task: AdminTask) {
+    setSavingTaskId(task.id);
+    setAdminTasksError("");
+    try {
+      const res = await api.clearTaskOverrides(task.id);
+      const updated = applyOverrideResponse(task, res);
+      setAdminTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+      setEditForm(formFromTask(updated));
+      const published = await api.listTasks();
+      setTasks(published);
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to reset overrides");
+    } finally {
+      setSavingTaskId(null);
+    }
+  }
+
   // Live users: heartbeat + polling while on the Live Users tab
   useEffect(() => {
-    if (!studentName) return;
+    if (!studentName || isAdmin) return;
     let heartbeatId: number | undefined;
     let pollId: number | undefined;
     let stopped = false;
@@ -119,9 +313,38 @@ export default function TaskListPage() {
       if (heartbeatId !== undefined) window.clearInterval(heartbeatId);
       if (pollId !== undefined) window.clearInterval(pollId);
     };
-  }, [activeTab, studentName]);
+  }, [activeTab, studentName, isAdmin]);
+
+  // Admins can still view the live users list without sending a student heartbeat
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "users") return;
+    let pollId: number | undefined;
+    let stopped = false;
+
+    async function fetchLive() {
+      try {
+        const users = await api.getLiveUsers(300);
+        if (!stopped) {
+          setLiveUsers(users);
+          setLiveUsersError("");
+        }
+      } catch (err) {
+        if (!stopped) {
+          setLiveUsersError(err instanceof Error ? err.message : "Failed to load live users");
+        }
+      }
+    }
+
+    fetchLive();
+    pollId = window.setInterval(fetchLive, 5000);
+    return () => {
+      stopped = true;
+      if (pollId !== undefined) window.clearInterval(pollId);
+    };
+  }, [activeTab, isAdmin]);
 
   const fetchPrompts = useCallback(() => {
+    if (!isAdmin) return;
     setPromptsLoading(true);
     setPromptsError("");
     api
@@ -136,11 +359,15 @@ export default function TaskListPage() {
         setPromptsError(err instanceof Error ? err.message : "Failed to load prompts")
       )
       .finally(() => setPromptsLoading(false));
-  }, [promptTaskId, promptStudentFilter]);
+  }, [promptTaskId, promptStudentFilter, isAdmin]);
 
   useEffect(() => {
-    if (activeTab === "prompts") fetchPrompts();
-  }, [activeTab, fetchPrompts]);
+    if (activeTab === "prompts" && isAdmin) fetchPrompts();
+  }, [activeTab, fetchPrompts, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && adminTasks.length === 0) fetchAdminTasks();
+  }, [isAdmin, adminTasks.length, fetchAdminTasks]);
 
   const fetchMasterLeaderboard = useCallback(() => {
     setMasterLbLoading(true);
@@ -194,12 +421,22 @@ export default function TaskListPage() {
           >
             🏆 Leaderboard
           </button>
-          <button
-            className={`tab-btn${activeTab === "prompts" ? " active" : ""}`}
-            onClick={() => setActiveTab("prompts")}
-          >
-            📋 Student Prompts
-          </button>
+          {isAdmin && (
+            <button
+              className={`tab-btn${activeTab === "prompts" ? " active" : ""}`}
+              onClick={() => setActiveTab("prompts")}
+            >
+              📋 Student Prompts
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              className={`tab-btn${activeTab === "workshop" ? " active" : ""}`}
+              onClick={() => setActiveTab("workshop")}
+            >
+              ⚙ Workshop Control
+            </button>
+          )}
           <button
             className={`tab-btn${activeTab === "users" ? " active" : ""}`}
             onClick={() => setActiveTab("users")}
@@ -350,8 +587,286 @@ export default function TaskListPage() {
           </div>
         )}
 
+        {/* ── Workshop Control panel (admin) ── */}
+        {activeTab === "workshop" && isAdmin && (
+          <>
+            <div className="panel-placeholder" style={{ textAlign: "left", maxWidth: 900, margin: "0 auto" }}>
+              <h3>Workshop control</h3>
+              <p style={{ marginBottom: "1rem" }}>
+                Publish activities and edit live task text (judge prompt, description, prompt UI copy).
+                Changes are stored in Supabase as overrides on top of <code>config.yaml</code> — no redeploy needed.
+                Use <strong>Reset to config.yaml</strong> to clear overrides for a task.
+              </p>
+              {adminTasksError && <div className="error-msg">{adminTasksError}</div>}
+              {adminTasksLoading && <div className="spinner" />}
+              {!adminTasksLoading && adminTasks.length === 0 && !adminTasksError && (
+                <div className="plog-empty">No tasks found in config.yaml.</div>
+              )}
+              {!adminTasksLoading &&
+                adminTasks.map((task) => {
+                  const isEditing = editingTaskId === task.id && editForm != null;
+                  const isPromptLike = task.task_type === "Prompt" || task.task_type === "Chat";
+                  return (
+                  <div
+                    key={task.id}
+                    className="act-card"
+                    style={{ marginBottom: "0.75rem" }}
+                  >
+                    <div className="act-header">
+                      <div className="act-header-left">
+                        <span className={`badge ${task.published ? "b-green" : "b-amber"}`}>
+                          {task.published ? "Published" : "Hidden"}
+                        </span>
+                        <span className="act-tag">{task.task_type}</span>
+                        {task.has_overrides && (
+                          <span className="badge b-purple">Overrides</span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => openEditForm(task)}
+                        >
+                          {isEditing ? "Close" : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${task.published ? "btn-outline" : "btn-primary"}`}
+                          disabled={togglingTaskId === task.id}
+                          onClick={() => handleTogglePublished(task)}
+                        >
+                          {togglingTaskId === task.id
+                            ? "Updating…"
+                            : task.published
+                              ? "Unpublish"
+                              : "Publish"}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="act-title" style={{ fontSize: "1.05rem" }}>
+                      {task.name}
+                    </div>
+                    <div className="act-scenario" style={{ marginBottom: isEditing ? "1rem" : 0 }}>
+                      <strong>ID:</strong> {task.id}
+                    </div>
+
+                    {isEditing && editForm && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <div className="lf">
+                          <label>Name</label>
+                          <input
+                            className="input"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          />
+                        </div>
+                        <div className="lf">
+                          <label>Description</label>
+                          <textarea
+                            className="input"
+                            rows={3}
+                            value={editForm.description}
+                            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                          />
+                        </div>
+
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.4rem" }}>
+                            <label style={{ fontWeight: 600, fontSize: 13 }}>Instructions</label>
+                            <button
+                              type="button"
+                              className="btn btn-ghost"
+                              style={{ padding: "2px 8px", fontSize: 12 }}
+                              onClick={() =>
+                                setEditForm({
+                                  ...editForm,
+                                  instructions: [...editForm.instructions, { verb: "", text: "" }],
+                                })
+                              }
+                            >
+                              + Add step
+                            </button>
+                          </div>
+                          {editForm.instructions.map((step, idx) => (
+                            <div key={idx} style={{ display: "flex", gap: "8px", marginBottom: "6px" }}>
+                              <input
+                                className="input"
+                                style={{ width: "110px" }}
+                                placeholder="Verb"
+                                value={step.verb}
+                                onChange={(e) => {
+                                  const next = [...editForm.instructions];
+                                  next[idx] = { ...next[idx], verb: e.target.value };
+                                  setEditForm({ ...editForm, instructions: next });
+                                }}
+                              />
+                              <input
+                                className="input"
+                                style={{ flex: 1 }}
+                                placeholder="Text"
+                                value={step.text}
+                                onChange={(e) => {
+                                  const next = [...editForm.instructions];
+                                  next[idx] = { ...next[idx], text: e.target.value };
+                                  setEditForm({ ...editForm, instructions: next });
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ padding: "2px 8px" }}
+                                onClick={() =>
+                                  setEditForm({
+                                    ...editForm,
+                                    instructions: editForm.instructions.filter((_, i) => i !== idx),
+                                  })
+                                }
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="lf">
+                          <label>Judge persona</label>
+                          <select
+                            className="input"
+                            value={editForm.judge_persona}
+                            onChange={(e) => setEditForm({ ...editForm, judge_persona: e.target.value })}
+                          >
+                            <option value="strict">strict</option>
+                            <option value="generous">generous</option>
+                          </select>
+                          {task.task_type === "Document" && (
+                            <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 4 }}>
+                              Document tasks use the built-in item scoring rubric (not a free-text scoring judge prompt).
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="lf">
+                          <label>Pre-prompt judge</label>
+                          <textarea
+                            className="input"
+                            rows={10}
+                            style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+                            value={editForm.pre_prompt_judge_prompt}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, pre_prompt_judge_prompt: e.target.value })
+                            }
+                          />
+                          <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 4 }}>
+                            Runs before scoring. Flags prompts that paste answers instead of writing extraction instructions.
+                          </div>
+                        </div>
+
+                        {isPromptLike && (
+                          <>
+                            <div className="lf">
+                              <label>Prompt panel title</label>
+                              <input
+                                className="input"
+                                value={editForm.prompt_panel_title}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, prompt_panel_title: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="lf">
+                              <label>Prompt panel body</label>
+                              <textarea
+                                className="input"
+                                rows={2}
+                                value={editForm.prompt_panel_body}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, prompt_panel_body: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="lf">
+                              <label>Prompt intro</label>
+                              <textarea
+                                className="input"
+                                rows={2}
+                                value={editForm.prompt_intro}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, prompt_intro: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="lf">
+                              <label>Prompt placeholder</label>
+                              <textarea
+                                className="input"
+                                rows={2}
+                                value={editForm.prompt_placeholder}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, prompt_placeholder: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="lf">
+                              <label>Scoring judge prompt</label>
+                              <textarea
+                                className="input"
+                                rows={12}
+                                style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+                                value={editForm.judge_prompt}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, judge_prompt: e.target.value })
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {task.task_type === "Prompt" && (
+                          <div className="lf">
+                            <label>Evaluate what</label>
+                            <select
+                              className="input"
+                              value={editForm.evaluate_what}
+                              onChange={(e) =>
+                                setEditForm({ ...editForm, evaluate_what: e.target.value })
+                              }
+                            >
+                              <option value="prompt">prompt</option>
+                              <option value="output">output</option>
+                            </select>
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            disabled={savingTaskId === task.id}
+                            onClick={() => handleSaveOverrides(task)}
+                          >
+                            {savingTaskId === task.id ? "Saving…" : "Save overrides"}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            disabled={savingTaskId === task.id || !task.has_overrides}
+                            onClick={() => handleResetOverrides(task)}
+                          >
+                            Reset to config.yaml
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  );
+                })}
+            </div>
+          </>
+        )}
+
         {/* ── Student Prompts panel ── */}
-        {activeTab === "prompts" && (
+        {activeTab === "prompts" && isAdmin && (
           <>
             <div className="plog-filter-row">
               <label htmlFor="plog-task">Activity</label>
@@ -362,7 +877,7 @@ export default function TaskListPage() {
                 onChange={(e) => setPromptTaskId(e.target.value)}
               >
                 <option value="">All activities</option>
-                {tasks.map((t) => (
+                {(adminTasks.length > 0 ? adminTasks : tasks).map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
               </select>

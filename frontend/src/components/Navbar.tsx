@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { clearSession, isAdminSession } from "../api";
 
 function getInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);
@@ -20,12 +21,12 @@ function getTotalScore(): number {
 export default function Navbar() {
   const navigate = useNavigate();
   const name = localStorage.getItem("studentName") ?? "";
+  const admin = isAdminSession();
   const totalScore = getTotalScore();
-  const initials = name ? getInitials(name) : "?";
+  const initials = name ? getInitials(name) : admin ? "AD" : "?";
 
   function handleLogout() {
-    localStorage.removeItem("studentName");
-    localStorage.removeItem("taskBests");
+    clearSession();
     navigate("/");
   }
 
@@ -39,14 +40,34 @@ export default function Navbar() {
         </div>
       </div>
 
-      {name && (
+      {(name || admin) && (
         <div className="nav-right">
           <div className="nav-user-chip">
             <div className="nav-av">{initials}</div>
-            <span className="nav-uname">{name}</span>
+            <span className="nav-uname">{admin ? "Admin" : name}</span>
+            {admin && (
+              <span
+                style={{
+                  marginLeft: "6px",
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  color: "var(--red, #c8102e)",
+                  background: "var(--red-l, #fde8ec)",
+                  border: "1px solid var(--red-b, #f5c2cb)",
+                  borderRadius: "4px",
+                  padding: "2px 6px",
+                }}
+              >
+                Admin
+              </span>
+            )}
           </div>
-          <span className="nav-score">{totalScore} pts</span>
-          <button className="logout-btn" onClick={handleLogout}>Leave</button>
+          {!admin && <span className="nav-score">{totalScore} pts</span>}
+          <button className="logout-btn" onClick={handleLogout}>
+            {admin ? "Sign out" : "Leave"}
+          </button>
         </div>
       )}
     </nav>

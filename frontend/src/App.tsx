@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { isAdminSession } from "./api";
 import LoginPage from "./pages/LoginPage";
 import TaskListPage from "./pages/TaskListPage";
 import TaskDetailPage from "./pages/TaskDetailPage";
@@ -7,7 +8,8 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 
 function RequireAuth({ children }: { children: ReactElement }) {
   const name = localStorage.getItem("studentName");
-  if (!name) return <Navigate to="/" replace />;
+  const admin = isAdminSession();
+  if (!name && !admin) return <Navigate to="/" replace />;
   return children;
 }
 

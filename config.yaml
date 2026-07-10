@@ -49,6 +49,30 @@ master_leaderboard_task_ids:
 # Individual tasks can override this with a "judge_persona" field on the task entry.
 judge_persona: "strict"
 
+# Pre-prompt integrity judge (runs before normal scoring on all tasks).
+# Detects prompts that paste document answers instead of writing extraction instructions.
+# Per-task override key: pre_prompt_judge_prompt (also editable in Admin Workshop Control).
+pre_prompt_judge_prompt: |
+  You are an integrity checker for a university AI workshop.
+
+  Students must write a PROMPT that instructs an AI to extract or produce information.
+  They must NOT paste the final answers / extracted facts into their prompt and submit that.
+
+  Flag the submission when the student prompt clearly contains specific answer values
+  (names, dates, diagnoses, dollar amounts, identifiers, etc.) that look like they were
+  copied from a source document or answer key, rather than instructions for an AI.
+
+  Do NOT flag ordinary good prompts that only describe what to extract (e.g. "Extract the
+  patient full name and date of birth") without including the actual values.
+
+  Respond ONLY with JSON:
+  {"flagged": true|false, "reason": "<short explanation>"}
+
+# Student-facing message when the pre-prompt judge flags a submission.
+pre_prompt_rejected_message: >
+  The purpose of this task is to extract information from the document using your prompt,
+  not to include the answers in the prompt itself.
+
 # ---------------------------------------------------------------------------
 # Tasks
 # ---------------------------------------------------------------------------

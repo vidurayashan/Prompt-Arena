@@ -2,13 +2,17 @@
 
 from datetime import datetime, timezone
 from pathlib import Path
+import hashlib
+import hmac
 import re
+import secrets
 import threading
+import time
 from typing import Any
 
 import os
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -51,6 +55,25 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     name: str
+
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class AdminLoginResponse(BaseModel):
+    token: str
+    role: str = "admin"
+    display_name: str = "Admin"
+
+
+class SetPublishedRequest(BaseModel):
+    published: bool
+
+
+class SetOverridesRequest(BaseModel):
+    overrides: dict[str, Any]
 
 
 class PresencePingRequest(BaseModel):
@@ -100,6 +123,7 @@ class SubmitResponse(BaseModel):
     is_new_best: bool
     judge_breakdown: dict[str, JudgeBreakdownItem] | None = None
     judge_feedback: str | None = None
+    prompt_rejected: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -114,6 +138,263 @@ _STUDENT_NAME_RE = re.compile(r".+\(\d+\)$")
 # Presence registry (single-instance only). Map student_name -> last_seen_utc
 _presence_lock = threading.Lock()
 _presence_last_seen: dict[str, datetime] = {}
+
+# Admin tokens: ~7 days
+_ADMIN_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
+
+
+def _admin_username() -> str:
+    return (os.environ.get("ADMIN_USERNAME") or "admin").strip()
+
+
+def _admin_password() -> str:
+    return os.environ.get("ADMIN_PASSWORD") or ""
+
+
+def _admin_token_secret() -> bytes:
+    """HMAC secret for admin tokens. Prefer ADMIN_TOKEN_SECRET; fall back to ADMIN_PASSWORD."""
+    secret = os.environ.get("ADMIN_TOKEN_SECRET") or _admin_password()
+    if not secret:
+        raise HTTPException(
+            status_code=500,
+            detail="Admin auth is not configured. Set ADMIN_PASSWORD in the environment.",
+        )
+    return secret.encode("utf-8")
+
+
+def _create_admin_token() -> str:
+    exp = int(time.time()) + _ADMIN_TOKEN_TTL_SECONDS
+    nonce = secrets.token_hex(8)
+    payload = f"admin:{exp}:{nonce}"
+    sig = hmac.new(_admin_token_secret(), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload}:{sig}"
+
+
+def _verify_admin_token(token: str) -> bool:
+    try:
+        parts = token.split(":")
+        if len(parts) != 4:
+            return False
+        role, exp_s, nonce, sig = parts
+        if role != "admin":
+            return False
+        exp = int(exp_s)
+        if exp < int(time.time()):
+            return False
+        payload = f"{role}:{exp_s}:{nonce}"
+        expected = hmac.new(
+            _admin_token_secret(), payload.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(expected, sig)
+    except Exception:
+        return False
+
+
+def require_admin(authorization: str | None = Header(default=None)) -> None:
+    """FastAPI dependency: require a valid admin Bearer token."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Admin authentication required")
+    token = authorization[len("Bearer ") :].strip()
+    if not token or not _verify_admin_token(token):
+        raise HTTPException(status_code=401, detail="Invalid or expired admin token")
+
+
+def _require_published_task(task_id: str) -> dict[str, Any]:
+    """Load a merged task and ensure it is published for students."""
+    task = _merged_task(task_id)
+    published = leaderboard.get_published_task_ids()
+    if task_id not in published:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return task
+
+
+_OVERRIDE_KEYS = frozenset({
+    "name",
+    "description",
+    "instructions",
+    "prompt_intro",
+    "prompt_panel_title",
+    "prompt_panel_body",
+    "prompt_placeholder",
+    "judge_prompt",
+    "pre_prompt_judge_prompt",
+    "judge_persona",
+    "evaluate_what",
+})
+
+_DEFAULT_PRE_PROMPT_REJECTED_MESSAGE = (
+    "The purpose of this task is to extract information from the document using your prompt, "
+    "not to include the answers in the prompt itself."
+)
+
+
+def _sanitize_overrides(raw: Any) -> dict[str, Any]:
+    """Keep only allowlisted keys; drop empty values so yaml defaults apply."""
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=400, detail="overrides must be an object")
+
+    cleaned: dict[str, Any] = {}
+    unknown = [k for k in raw.keys() if k not in _OVERRIDE_KEYS]
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown override keys: {', '.join(sorted(str(k) for k in unknown))}",
+        )
+
+    for key, value in raw.items():
+        if key not in _OVERRIDE_KEYS:
+            continue
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        if key == "instructions":
+            if not isinstance(value, list):
+                raise HTTPException(status_code=400, detail="instructions must be a list")
+            steps: list[dict[str, str]] = []
+            for step in value:
+                if not isinstance(step, dict):
+                    raise HTTPException(status_code=400, detail="Each instruction must be an object")
+                verb = str(step.get("verb", "")).strip()
+                text = str(step.get("text", "")).strip()
+                if not verb and not text:
+                    continue
+                if not verb or not text:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Each instruction needs both verb and text",
+                    )
+                steps.append({"verb": verb, "text": text})
+            if not steps:
+                continue
+            cleaned[key] = steps
+            continue
+        if key == "judge_persona":
+            persona = str(value).strip().lower()
+            if persona not in ("strict", "generous"):
+                raise HTTPException(status_code=400, detail="judge_persona must be 'strict' or 'generous'")
+            cleaned[key] = persona
+            continue
+        if key == "evaluate_what":
+            ew = str(value).strip().lower()
+            if ew not in ("prompt", "output"):
+                raise HTTPException(status_code=400, detail="evaluate_what must be 'prompt' or 'output'")
+            cleaned[key] = ew
+            continue
+        if isinstance(value, str):
+            cleaned[key] = value
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
+def _apply_overrides(base_task: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    """Shallow-merge allowlisted override keys onto a config task copy."""
+    merged = dict(base_task)
+    for key, value in overrides.items():
+        if key in _OVERRIDE_KEYS:
+            merged[key] = value
+    return merged
+
+
+def _merged_task(task_id: str) -> dict[str, Any]:
+    """Load task from config.yaml and apply any Supabase overrides."""
+    task = _safe_task(task_id)
+    overrides = leaderboard.get_task_overrides(task_id)
+    if not overrides:
+        return task
+    return _apply_overrides(task, overrides)
+
+
+def _effective_pre_prompt_judge_prompt(task: dict[str, Any], cfg: dict[str, Any]) -> str:
+    """Per-task override, else global config default."""
+    raw = task.get("pre_prompt_judge_prompt") or cfg.get("pre_prompt_judge_prompt") or ""
+    return str(raw).strip()
+
+
+def _pre_prompt_rejected_message(cfg: dict[str, Any]) -> str:
+    raw = cfg.get("pre_prompt_rejected_message")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return _DEFAULT_PRE_PROMPT_REJECTED_MESSAGE
+
+
+def _run_pre_prompt_integrity_check(
+    *,
+    cfg: dict[str, Any],
+    task: dict[str, Any],
+    student_prompt: str,
+    judge_key: str,
+    judge_base_url: str | None,
+) -> dict[str, Any] | None:
+    """
+    Run the pre-prompt integrity judge.
+    Returns None if clean / unavailable; returns {"flagged": True, "reason": ...} if blocked.
+    """
+    judge_prompt = _effective_pre_prompt_judge_prompt(task, cfg)
+    if not judge_prompt or not student_prompt.strip():
+        return None
+
+    items = None
+    if task.get("task_type", "Document") == "Document" and isinstance(task.get("items"), list):
+        items = task["items"]
+
+    try:
+        result = llm_client.run_pre_prompt_judge(
+            api_key=judge_key,
+            judge_model=cfg["judge_model"],
+            judge_prompt=judge_prompt,
+            student_prompt=student_prompt,
+            task_name=str(task.get("name", "")),
+            task_description=str(task.get("description", "")),
+            items=items,
+            base_url=judge_base_url,
+            temperature=cfg.get("judge_temperature"),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Pre-prompt judge error: {exc}")
+
+    if result.get("flagged"):
+        return result
+    return None
+
+
+def _rejected_submit_response(
+    *,
+    cfg: dict[str, Any],
+    task: dict[str, Any],
+    task_id: str,
+    student_name: str,
+    stored_prompt: str,
+    since: datetime | None,
+) -> SubmitResponse:
+    """Score 0 + warning when pre-prompt integrity check fails; still persist the attempt."""
+    message = _pre_prompt_rejected_message(cfg)
+    previous_best = leaderboard.get_student_best(student_name, task_id, since=since)
+    leaderboard.upsert_score(student_name, task_id, 0, stored_prompt)
+    score_items: list[ScoreItem] = []
+    if task.get("task_type", "Document") == "Document" and isinstance(task.get("items"), list):
+        score_items = [
+            ScoreItem(
+                item_id=int(item["id"]),
+                label=str(item.get("label", f"Item {item['id']}")),
+                score=0,
+                correct_answer="",
+                found="",
+                reason="Prompt rejected by integrity check",
+            )
+            for item in task["items"]
+            if isinstance(item, dict) and "id" in item
+        ]
+    return SubmitResponse(
+        student_output="",
+        scores=score_items,
+        total=0,
+        previous_best=previous_best,
+        is_new_best=False,
+        judge_feedback=message,
+        prompt_rejected=True,
+    )
 
 
 def _validate_student_name(raw: Any) -> str:
@@ -252,6 +533,144 @@ def login(body: LoginRequest) -> LoginResponse:
     return LoginResponse(name=name)
 
 
+def _const_eq(a: str, b: str) -> bool:
+    """Constant-time string compare that tolerates unequal lengths."""
+    # Hash both so compare_digest always sees equal-length digests.
+    return hmac.compare_digest(
+        hashlib.sha256(a.encode("utf-8")).digest(),
+        hashlib.sha256(b.encode("utf-8")).digest(),
+    )
+
+
+@app.post("/api/admin/login", response_model=AdminLoginResponse)
+def admin_login(body: AdminLoginRequest) -> AdminLoginResponse:
+    expected_user = _admin_username()
+    expected_pass = _admin_password()
+    if not expected_pass:
+        raise HTTPException(
+            status_code=500,
+            detail="Admin auth is not configured. Set ADMIN_PASSWORD in the environment.",
+        )
+    user_ok = _const_eq(body.username.strip(), expected_user)
+    pass_ok = _const_eq(body.password, expected_pass)
+    if not (user_ok and pass_ok):
+        raise HTTPException(status_code=401, detail="Invalid admin credentials")
+    return AdminLoginResponse(
+        token=_create_admin_token(),
+        role="admin",
+        display_name="Admin",
+    )
+
+
+@app.get("/api/admin/tasks")
+def admin_list_tasks(_: None = Depends(require_admin)) -> list[dict[str, Any]]:
+    """All config tasks with published flags and merged editable fields (admin only)."""
+    cfg = config_loader.get_config()
+    flags = leaderboard.get_publish_flags()
+    all_overrides = leaderboard.get_all_task_overrides()
+    result: list[dict[str, Any]] = []
+    for t in cfg.get("tasks", []):
+        tid = t["id"]
+        overrides = all_overrides.get(tid, {})
+        merged = _apply_overrides(t, overrides) if overrides else t
+        entry: dict[str, Any] = {
+            "id": tid,
+            "name": merged.get("name", ""),
+            "description": merged.get("description", ""),
+            "task_type": merged.get("task_type", "Document"),
+            "published": bool(flags.get(tid, False)),
+            "overrides": overrides,
+            "has_overrides": bool(overrides),
+        }
+        if "instructions" in merged:
+            entry["instructions"] = merged["instructions"]
+        for key in (
+            "prompt_intro",
+            "prompt_panel_title",
+            "prompt_panel_body",
+            "prompt_placeholder",
+            "judge_prompt",
+            "pre_prompt_judge_prompt",
+            "judge_persona",
+            "evaluate_what",
+        ):
+            if key in merged:
+                entry[key] = merged[key]
+        # Always expose effective pre-prompt judge (task override or global default)
+        entry["pre_prompt_judge_prompt"] = _effective_pre_prompt_judge_prompt(merged, cfg)
+        result.append(entry)
+    return result
+
+
+@app.put("/api/admin/tasks/{task_id}/published")
+def admin_set_task_published(
+    task_id: str,
+    body: SetPublishedRequest,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    _safe_task(task_id)
+    leaderboard.set_task_published(task_id, body.published)
+    return {"id": task_id, "published": body.published}
+
+
+@app.put("/api/admin/tasks/{task_id}/overrides")
+def admin_set_task_overrides(
+    task_id: str,
+    body: SetOverridesRequest,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    _safe_task(task_id)
+    cleaned = _sanitize_overrides(body.overrides)
+    saved = leaderboard.set_task_overrides(task_id, cleaned)
+    cfg = config_loader.get_config()
+    merged = _merged_task(task_id)
+    return {
+        "id": task_id,
+        "overrides": saved,
+        "has_overrides": bool(saved),
+        "name": merged.get("name", ""),
+        "description": merged.get("description", ""),
+        "task_type": merged.get("task_type", "Document"),
+        "instructions": merged.get("instructions"),
+        "prompt_intro": merged.get("prompt_intro"),
+        "prompt_panel_title": merged.get("prompt_panel_title"),
+        "prompt_panel_body": merged.get("prompt_panel_body"),
+        "prompt_placeholder": merged.get("prompt_placeholder"),
+        "judge_prompt": merged.get("judge_prompt"),
+        "pre_prompt_judge_prompt": _effective_pre_prompt_judge_prompt(merged, cfg),
+        "judge_persona": merged.get("judge_persona"),
+        "evaluate_what": merged.get("evaluate_what"),
+    }
+
+
+@app.delete("/api/admin/tasks/{task_id}/overrides")
+def admin_clear_task_overrides(
+    task_id: str,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    _safe_task(task_id)
+    leaderboard.clear_task_overrides(task_id)
+    cfg = config_loader.get_config()
+    merged = _merged_task(task_id)
+    return {
+        "id": task_id,
+        "overrides": {},
+        "has_overrides": False,
+        "name": merged.get("name", ""),
+        "description": merged.get("description", ""),
+        "task_type": merged.get("task_type", "Document"),
+        "instructions": merged.get("instructions"),
+        "prompt_intro": merged.get("prompt_intro"),
+        "prompt_panel_title": merged.get("prompt_panel_title"),
+        "prompt_panel_body": merged.get("prompt_panel_body"),
+        "prompt_placeholder": merged.get("prompt_placeholder"),
+        "judge_prompt": merged.get("judge_prompt"),
+        "pre_prompt_judge_prompt": _effective_pre_prompt_judge_prompt(merged, cfg),
+        "judge_persona": merged.get("judge_persona"),
+        "evaluate_what": merged.get("evaluate_what"),
+    }
+
+
 @app.post("/api/presence/ping")
 def presence_ping(body: PresencePingRequest) -> dict[str, bool]:
     name = _validate_student_name(body.student_name)
@@ -280,27 +699,33 @@ def presence_list(
 @app.get("/api/tasks")
 def list_tasks() -> list[dict[str, Any]]:
     cfg = config_loader.get_config()
-    return [
-        {
-            "id": t["id"],
-            "name": t["name"],
-            "description": t["description"],
-            "instructions": t.get("instructions"),
-        }
-        for t in cfg.get("tasks", [])
-    ]
+    published = leaderboard.get_published_task_ids()
+    all_overrides = leaderboard.get_all_task_overrides()
+    result: list[dict[str, Any]] = []
+    for t in cfg.get("tasks", []):
+        if t["id"] not in published:
+            continue
+        overrides = all_overrides.get(t["id"], {})
+        merged = _apply_overrides(t, overrides) if overrides else t
+        result.append({
+            "id": merged["id"],
+            "name": merged["name"],
+            "description": merged["description"],
+            "instructions": merged.get("instructions"),
+        })
+    return result
 
 
 @app.get("/api/tasks/{task_id}")
 def get_task(task_id: str) -> dict[str, Any]:
     cfg = config_loader.get_config()
-    task = _safe_task(task_id)
+    task = _require_published_task(task_id)
     return _public_task(task, cfg)
 
 
 @app.get("/api/tasks/{task_id}/document")
 def download_document(task_id: str) -> FileResponse:
-    task = _safe_task(task_id)
+    task = _require_published_task(task_id)
     if task.get("task_type", "Document") != "Document":
         raise HTTPException(status_code=400, detail="This task type does not have a document")
     doc_path = config_loader.get_document_path(task)
@@ -318,7 +743,7 @@ def download_document(task_id: str) -> FileResponse:
 @app.post("/api/tasks/{task_id}/submit", response_model=SubmitResponse)
 def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     cfg = config_loader.get_config()
-    task = _safe_task(task_id)
+    task = _require_published_task(task_id)
     since = _data_cutoff_since(cfg)
 
     openai_key     = cfg.get("openai_api_key", "")
@@ -346,6 +771,24 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     task_type = task.get("task_type", "Document")
     judge_breakdown = None
     judge_feedback = None
+
+    # Pre-prompt integrity check (all task types that use /submit)
+    flagged = _run_pre_prompt_integrity_check(
+        cfg=cfg,
+        task=task,
+        student_prompt=body.prompt,
+        judge_key=judge_key,
+        judge_base_url=judge_base_url,
+    )
+    if flagged:
+        return _rejected_submit_response(
+            cfg=cfg,
+            task=task,
+            task_id=task_id,
+            student_name=body.student_name,
+            stored_prompt=body.prompt,
+            since=since,
+        )
 
     if task_type == "Document":
         # 1. Extract PDF text
@@ -480,12 +923,13 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         is_new_best=is_new_best,
         judge_breakdown=judge_breakdown if isinstance(judge_breakdown, dict) else None,
         judge_feedback=judge_feedback if isinstance(judge_feedback, str) else None,
+        prompt_rejected=False,
     )
 
 
 @app.get("/api/tasks/{task_id}/leaderboard")
 def get_leaderboard(task_id: str) -> list[dict[str, Any]]:
-    _safe_task(task_id)
+    _require_published_task(task_id)
     cfg = config_loader.get_config()
     since = _data_cutoff_since(cfg)
     return leaderboard.get_leaderboard(task_id, since=since)
@@ -496,7 +940,7 @@ def get_history(
     task_id: str,
     student: str = Query(..., description="Student name"),
 ) -> list[dict[str, Any]]:
-    _safe_task(task_id)
+    _require_published_task(task_id)
     cfg = config_loader.get_config()
     since = _data_cutoff_since(cfg)
     return leaderboard.get_student_history(student, task_id, since=since)
@@ -508,8 +952,9 @@ def get_student_prompts(
     student: str | None = Query(None, description="Filter by student name (substring)"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    _: None = Depends(require_admin),
 ) -> list[dict[str, Any]]:
-    """List submitted prompts for the Student Prompts tab. Optional filters: task_id, student."""
+    """List submitted prompts for the Student Prompts tab (admin only)."""
     cfg = config_loader.get_config()
     since = _data_cutoff_since(cfg)
     rows = leaderboard.get_student_prompts(
@@ -522,6 +967,10 @@ def get_student_prompts(
     result = []
     for row in rows:
         task = config_loader.get_task(row["task_id"])
+        if task is not None:
+            overrides = leaderboard.get_task_overrides(row["task_id"])
+            if overrides:
+                task = _apply_overrides(task, overrides)
         task_name = task["name"] if task else row["task_id"]
         result.append({
             "student_name": row["student_name"],
@@ -574,7 +1023,7 @@ def get_master_leaderboard(
 @app.post("/api/tasks/{task_id}/chat/message")
 def chat_message(task_id: str, body: ChatTurnRequest) -> dict[str, str]:
     cfg = config_loader.get_config()
-    task = _safe_task(task_id)
+    task = _require_published_task(task_id)
 
     if task.get("task_type") != "Chat":
         raise HTTPException(status_code=400, detail="This endpoint is only for Chat tasks")
@@ -614,7 +1063,7 @@ def chat_message(task_id: str, body: ChatTurnRequest) -> dict[str, str]:
 @app.post("/api/tasks/{task_id}/chat/score", response_model=SubmitResponse)
 def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
     cfg = config_loader.get_config()
-    task = _safe_task(task_id)
+    task = _require_published_task(task_id)
     since = _data_cutoff_since(cfg)
 
     if task.get("task_type") != "Chat":
@@ -633,10 +1082,31 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
 
     # Flatten chat history into a single transcript string
     lines: list[str] = []
+    student_lines: list[str] = []
     for msg in body.history:
         speaker = "STUDENT" if msg.role == "student" else "ASSISTANT"
         lines.append(f"{speaker}: {msg.content}")
+        if msg.role == "student":
+            student_lines.append(msg.content)
     transcript = "\n".join(lines)
+    student_prompt_text = "\n\n".join(student_lines)
+
+    flagged = _run_pre_prompt_integrity_check(
+        cfg=cfg,
+        task=task,
+        student_prompt=student_prompt_text,
+        judge_key=judge_key,
+        judge_base_url=judge_base_url,
+    )
+    if flagged:
+        return _rejected_submit_response(
+            cfg=cfg,
+            task=task,
+            task_id=task_id,
+            student_name=body.student_name,
+            stored_prompt=transcript,
+            since=since,
+        )
 
     try:
         judgment_simple = llm_client.run_prompt_judge(
@@ -663,6 +1133,8 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         total=total_score,
         previous_best=previous_best,
         is_new_best=is_new_best,
+        judge_feedback=judgment_simple.get("feedback") if isinstance(judgment_simple.get("feedback"), str) else None,
+        prompt_rejected=False,
     )
 
 

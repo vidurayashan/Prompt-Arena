@@ -26,6 +26,57 @@ export interface TaskDetail extends Task {
   prompt_placeholder?: string;
 }
 
+export interface AdminTask {
+  id: string;
+  name: string;
+  description: string;
+  task_type: string;
+  published: boolean;
+  overrides?: Record<string, unknown>;
+  has_overrides?: boolean;
+  instructions?: { verb: string; text: string }[];
+  prompt_intro?: string;
+  prompt_panel_title?: string;
+  prompt_panel_body?: string;
+  prompt_placeholder?: string;
+  judge_prompt?: string;
+  pre_prompt_judge_prompt?: string;
+  judge_persona?: string;
+  evaluate_what?: "prompt" | "output" | string;
+}
+
+export interface TaskOverridesPayload {
+  name?: string;
+  description?: string;
+  instructions?: { verb: string; text: string }[];
+  prompt_intro?: string;
+  prompt_panel_title?: string;
+  prompt_panel_body?: string;
+  prompt_placeholder?: string;
+  judge_prompt?: string;
+  pre_prompt_judge_prompt?: string;
+  judge_persona?: string;
+  evaluate_what?: string;
+}
+
+export interface AdminTaskOverrideResponse {
+  id: string;
+  overrides: Record<string, unknown>;
+  has_overrides: boolean;
+  name: string;
+  description: string;
+  task_type: string;
+  instructions?: { verb: string; text: string }[] | null;
+  prompt_intro?: string | null;
+  prompt_panel_title?: string | null;
+  prompt_panel_body?: string | null;
+  prompt_placeholder?: string | null;
+  judge_prompt?: string | null;
+  pre_prompt_judge_prompt?: string | null;
+  judge_persona?: string | null;
+  evaluate_what?: string | null;
+}
+
 export interface ChatMessage {
   role: "student" | "assistant";
   content: string;
@@ -48,6 +99,7 @@ export interface SubmitResponse {
   is_new_best: boolean;
   judge_breakdown?: Record<string, { score: number; max: number }> | null;
   judge_feedback?: string | null;
+  prompt_rejected?: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -92,10 +144,34 @@ export interface GetStudentPromptsParams {
   offset?: number;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+function getAdminToken(): string | null {
+  return localStorage.getItem("adminToken");
+}
+
+export function isAdminSession(): boolean {
+  return localStorage.getItem("role") === "admin" && !!getAdminToken();
+}
+
+export function clearSession(): void {
+  localStorage.removeItem("studentName");
+  localStorage.removeItem("taskBests");
+  localStorage.removeItem("adminToken");
+  localStorage.removeItem("role");
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit, auth: "none" | "admin" = "none"): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (auth === "admin") {
+    const token = getAdminToken();
+    if (!token) throw new Error("Admin authentication required");
+    headers.Authorization = `Bearer ${token}`;
+  }
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers,
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
@@ -111,7 +187,42 @@ export const api = {
       body: JSON.stringify({ name }),
     }),
 
+  adminLogin: (username: string, password: string) =>
+    apiFetch<{ token: string; role: string; display_name: string }>("/api/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ username, password }),
+    }),
+
   listTasks: () => apiFetch<Task[]>("/api/tasks"),
+
+  getAdminTasks: () => apiFetch<AdminTask[]>("/api/admin/tasks", undefined, "admin"),
+
+  setTaskPublished: (taskId: string, published: boolean) =>
+    apiFetch<{ id: string; published: boolean }>(
+      `/api/admin/tasks/${encodeURIComponent(taskId)}/published`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ published }),
+      },
+      "admin"
+    ),
+
+  updateTaskOverrides: (taskId: string, overrides: TaskOverridesPayload) =>
+    apiFetch<AdminTaskOverrideResponse>(
+      `/api/admin/tasks/${encodeURIComponent(taskId)}/overrides`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ overrides }),
+      },
+      "admin"
+    ),
+
+  clearTaskOverrides: (taskId: string) =>
+    apiFetch<AdminTaskOverrideResponse>(
+      `/api/admin/tasks/${encodeURIComponent(taskId)}/overrides`,
+      { method: "DELETE" },
+      "admin"
+    ),
 
   getTask: (taskId: string) => apiFetch<TaskDetail>(`/api/tasks/${taskId}`),
 
@@ -148,7 +259,11 @@ export const api = {
     if (params.limit != null) sp.set("limit", String(params.limit));
     if (params.offset != null) sp.set("offset", String(params.offset));
     const q = sp.toString();
-    return apiFetch<StudentPromptEntry[]>(`/api/student-prompts${q ? `?${q}` : ""}`);
+    return apiFetch<StudentPromptEntry[]>(
+      `/api/student-prompts${q ? `?${q}` : ""}`,
+      undefined,
+      "admin"
+    );
   },
 
   getMasterLeaderboard: (limit: number = 50) =>

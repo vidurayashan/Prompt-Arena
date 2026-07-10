@@ -314,6 +314,72 @@ def run_judge(
     return result
 
 
+def run_pre_prompt_judge(
+    api_key: str,
+    judge_model: str,
+    judge_prompt: str,
+    student_prompt: str,
+    task_name: str = "",
+    task_description: str = "",
+    items: list[dict[str, Any]] | None = None,
+    base_url: str | None = None,
+    temperature: float | None = None,
+) -> dict[str, Any]:
+    """Check whether a student prompt appears to dump answers instead of instructing extraction.
+
+    Returns: {"flagged": bool, "reason": str}
+    """
+    client = _client(api_key, base_url)
+
+    context_parts = [
+        f"TASK NAME: {task_name or '(unknown)'}",
+        f"TASK DESCRIPTION:\n{task_description or '(none)'}",
+    ]
+    if items:
+        lines = []
+        for item in items:
+            label = item.get("label", "")
+            answer = item.get("answer", "")
+            lines.append(f"  - {label}: {answer}")
+        context_parts.append(
+            "KNOWN EXTRACTION ITEMS AND CORRECT ANSWERS (for detecting pasted answers):\n"
+            + "\n".join(lines)
+        )
+    context_parts.append(
+        "STUDENT PROMPT TO CHECK:\n"
+        "=== PROMPT START ===\n"
+        f"{student_prompt}\n"
+        "=== PROMPT END ===\n\n"
+        'Respond ONLY with JSON: {"flagged": true|false, "reason": "<short explanation>"}'
+    )
+    user_msg = "\n\n".join(context_parts)
+
+    kwargs: dict[str, Any] = {
+        "model": judge_model,
+        "messages": [
+            {"role": "system", "content": judge_prompt},
+            {"role": "user", "content": user_msg},
+        ],
+    }
+    if temperature is not None:
+        kwargs["temperature"] = float(temperature)
+
+    response = client.chat.completions.create(**kwargs)
+    raw = response.choices[0].message.content or "{}"
+    raw = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("```").strip()
+
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        data = {}
+
+    flagged = bool(data.get("flagged")) if isinstance(data.get("flagged"), bool) else False
+    reason = data.get("reason")
+    if not isinstance(reason, str):
+        reason = ""
+    return {"flagged": flagged, "reason": reason}
+
+
 def run_prompt_judge(
     api_key: str,
     judge_model: str,

@@ -426,10 +426,30 @@ export default function TaskDetailPage() {
         {/* Results */}
         {result && stage === "done" && (
           <div ref={resultRef}>
-            <div className="card mb-2">
-              <h2>Model output</h2>
-              <div className="output-box">{result.student_output}</div>
-            </div>
+            {result.prompt_rejected && (
+              <div
+                className="card mb-2"
+                style={{
+                  border: "1px solid var(--red-b, #f5c2cb)",
+                  background: "var(--red-l, #fde8ec)",
+                }}
+              >
+                <h2 style={{ marginBottom: "0.5rem", color: "var(--red, #c8102e)" }}>
+                  Prompt not accepted
+                </h2>
+                <p style={{ margin: 0, lineHeight: 1.55 }}>
+                  {result.judge_feedback ||
+                    "The purpose of this task is to extract information from the document using your prompt, not to include the answers in the prompt itself."}
+                </p>
+              </div>
+            )}
+
+            {!result.prompt_rejected && result.student_output && (
+              <div className="card mb-2">
+                <h2>Model output</h2>
+                <div className="output-box">{result.student_output}</div>
+              </div>
+            )}
 
             <div className="card mb-2">
               <h2 style={{ marginBottom: "1rem" }}>Your score</h2>
