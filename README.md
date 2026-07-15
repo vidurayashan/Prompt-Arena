@@ -107,6 +107,12 @@ CREATE TABLE IF NOT EXISTS task_overrides (
   overrides  JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE TABLE IF NOT EXISTS workshop_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 ```
 
 By default, tasks are **unpublished** until an admin publishes them. After admin sign-in:
@@ -115,6 +121,15 @@ By default, tasks are **unpublished** until an admin publishes them. After admin
 2. Click **Publish** on the activities you want students to see
 3. Click **Edit** on a task to change judge prompt / description / prompt copy, then **Save overrides**
 4. Use **Student Prompts** (admin-only) to review submissions
+
+### Reset for a new class
+
+When another lecturer / class uses the same deployed app, open **Workshop Control** and click **Reset for new class**. That:
+
+- Soft-clears leaderboards, history, and Student Prompts by setting a live `data_cutoff_after` timestamp in Supabase (old rows are kept, just hidden)
+- Unpublishes all tasks so the next session starts clean
+
+Ask students to refresh or rejoin so their browser point totals match. Shared admin access means a reset affects everyone on this deployment.
 
 ## File structure
 

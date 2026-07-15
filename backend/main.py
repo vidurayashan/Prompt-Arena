@@ -76,6 +76,10 @@ class SetOverridesRequest(BaseModel):
     overrides: dict[str, Any]
 
 
+class ResetSessionRequest(BaseModel):
+    unpublish_all: bool = True
+
+
 class PresencePingRequest(BaseModel):
     student_name: str
 
@@ -466,13 +470,34 @@ def _parse_data_cutoff_after(raw: Any) -> datetime | None:
 
 
 def _data_cutoff_since(cfg: dict[str, Any]) -> datetime | None:
-    raw = cfg.get("data_cutoff_after")
+    """Prefer live Supabase workshop_settings over config.yaml data_cutoff_after."""
+    raw: Any = None
+    try:
+        raw = leaderboard.get_setting("data_cutoff_after")
+    except Exception:
+        raw = None
+    if raw in (None, "", "null"):
+        raw = cfg.get("data_cutoff_after")
     if raw in (None, "", "null"):
         return None
     try:
         return _parse_data_cutoff_after(raw)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Invalid config data_cutoff_after: {exc}")
+
+
+def _effective_data_cutoff_raw(cfg: dict[str, Any]) -> str | None:
+    """Return the raw cutoff string currently in effect (DB first, then yaml)."""
+    try:
+        db_val = leaderboard.get_setting("data_cutoff_after")
+    except Exception:
+        db_val = None
+    if isinstance(db_val, str) and db_val.strip():
+        return db_val.strip()
+    yaml_val = cfg.get("data_cutoff_after")
+    if isinstance(yaml_val, str) and yaml_val.strip():
+        return yaml_val.strip()
+    return None
 
 
 def _safe_task(task_id: str) -> dict[str, Any]:
@@ -671,6 +696,36 @@ def admin_clear_task_overrides(
     }
 
 
+@app.get("/api/admin/session")
+def admin_get_session(_: None = Depends(require_admin)) -> dict[str, Any]:
+    """Current workshop session status for admin UI."""
+    cfg = config_loader.get_config()
+    cutoff_raw = _effective_data_cutoff_raw(cfg)
+    published = leaderboard.get_published_task_ids()
+    return {
+        "data_cutoff_after": cutoff_raw,
+        "published_count": len(published),
+    }
+
+
+@app.post("/api/admin/reset-session")
+def admin_reset_session(
+    body: ResetSessionRequest,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    """Soft-reset leaderboards/prompts by setting data cutoff to now; optionally unpublish all."""
+    now = datetime.now(timezone.utc)
+    cutoff = now.isoformat()
+    leaderboard.set_setting("data_cutoff_after", cutoff)
+    unpublished = 0
+    if body.unpublish_all:
+        unpublished = leaderboard.unpublish_all_tasks()
+    return {
+        "data_cutoff_after": cutoff,
+        "unpublished": unpublished,
+    }
+
+
 @app.post("/api/presence/ping")
 def presence_ping(body: PresencePingRequest) -> dict[str, bool]:
     name = _validate_student_name(body.student_name)
@@ -693,6 +748,7 @@ def presence_list(
         {"student_name": name, "last_seen": seen.isoformat()}
         for name, seen in rows
         if (now - seen).total_seconds() <= active_within_seconds
+        and name != "Admin"
     ]
 
 
@@ -986,38 +1042,45 @@ def get_student_prompts(
 @app.get("/api/master-leaderboard")
 def get_master_leaderboard(
     limit: int = Query(50, ge=1, le=200),
-) -> list[dict[str, Any]]:
+) -> dict[str, Any]:
     cfg = config_loader.get_config()
     since = _data_cutoff_since(cfg)
 
     task_ids_raw = cfg.get("master_leaderboard_task_ids", [])
     if task_ids_raw is None:
-        return []
+        return {"entries": [], "max_points": 0, "task_count": 0}
     if not isinstance(task_ids_raw, list) or any(not isinstance(x, str) for x in task_ids_raw):
         raise HTTPException(status_code=500, detail="Invalid config master_leaderboard_task_ids: must be a list of strings")
-    task_ids = [x.strip() for x in task_ids_raw if x and x.strip()]
-    if not task_ids:
-        return []
+    configured_ids = [x.strip() for x in task_ids_raw if x and x.strip()]
+    if not configured_ids:
+        return {"entries": [], "max_points": 0, "task_count": 0}
 
     # Validate task IDs exist in config.yaml (catch typos early)
     known_ids = {t.get("id") for t in cfg.get("tasks", []) if isinstance(t, dict)}
-    unknown = [tid for tid in task_ids if tid not in known_ids]
+    unknown = [tid for tid in configured_ids if tid not in known_ids]
     if unknown:
         raise HTTPException(
             status_code=500,
             detail=f"Unknown task IDs in master_leaderboard_task_ids: {', '.join(unknown)}",
         )
 
+    published = leaderboard.get_published_task_ids()
+    task_ids = [tid for tid in configured_ids if tid in published]
+    task_count = len(task_ids)
+    max_points = task_count * 100
+    if not task_ids:
+        return {"entries": [], "max_points": 0, "task_count": 0}
+
     rows = leaderboard.get_master_leaderboard(task_ids=task_ids, limit=limit, since=since)
-    result = []
+    entries = []
     for row in rows:
-        result.append({
+        entries.append({
             "student_name": row["student_name"],
             "total_points": int(row["total_points"]) if row.get("total_points") is not None else 0,
             "tasks_completed": int(row["tasks_completed"]) if row.get("tasks_completed") is not None else 0,
             "last_submitted": row["last_submitted"].isoformat() if hasattr(row.get("last_submitted"), "isoformat") else str(row.get("last_submitted")),
         })
-    return result
+    return {"entries": entries, "max_points": max_points, "task_count": task_count}
 
 
 @app.post("/api/tasks/{task_id}/chat/message")

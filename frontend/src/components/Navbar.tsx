@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { clearSession, isAdminSession } from "../api";
+import { api, clearSession, isAdminSession } from "../api";
 
 function getInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);
@@ -9,10 +10,10 @@ function getInitials(displayName: string): string {
   return displayName.slice(0, 2).toUpperCase();
 }
 
-function getTotalScore(): number {
+function getPublishedTotalScore(publishedIds: string[]): number {
   try {
     const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
-    return Object.values(stored).reduce((sum, v) => sum + v, 0);
+    return publishedIds.reduce((sum, id) => sum + (Number(stored[id]) || 0), 0);
   } catch {
     return 0;
   }
@@ -22,8 +23,25 @@ export default function Navbar() {
   const navigate = useNavigate();
   const name = localStorage.getItem("studentName") ?? "";
   const admin = isAdminSession();
-  const totalScore = getTotalScore();
+  const [publishedTaskIds, setPublishedTaskIds] = useState<string[]>([]);
   const initials = name ? getInitials(name) : admin ? "AD" : "?";
+  const totalScore = getPublishedTotalScore(publishedTaskIds);
+
+  useEffect(() => {
+    if (admin) return;
+    let cancelled = false;
+    api
+      .listTasks()
+      .then((tasks) => {
+        if (!cancelled) setPublishedTaskIds(tasks.map((t) => t.id));
+      })
+      .catch(() => {
+        if (!cancelled) setPublishedTaskIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [admin]);
 
   function handleLogout() {
     clearSession();

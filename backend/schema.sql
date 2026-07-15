@@ -20,3 +20,12 @@ CREATE TABLE IF NOT EXISTS task_overrides (
 
 COMMENT ON TABLE task_overrides IS
   'Sparse live overrides for task text fields (judge_prompt, description, etc.) on top of config.yaml.';
+
+CREATE TABLE IF NOT EXISTS workshop_settings (
+  key        TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE workshop_settings IS
+  'Live workshop settings (e.g. data_cutoff_after for soft leaderboard reset between classes).';

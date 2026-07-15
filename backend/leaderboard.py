@@ -45,7 +45,7 @@ def get_leaderboard(task_id: str, limit: int = 50, since: datetime | None = None
             latest_conditions.append("s2.submitted_at >= %s")
         latest_where_sql = " AND ".join(latest_conditions)
 
-        conditions = ["s1.task_id = %s"]
+        conditions = ["s1.task_id = %s", "s1.student_name <> 'Admin'"]
         if since is not None:
             conditions.append("s1.submitted_at >= %s")
         where_sql = " AND ".join(conditions)
@@ -240,6 +240,67 @@ def set_task_published(task_id: str, published: bool) -> None:
         con.close()
 
 
+def unpublish_all_tasks() -> int:
+    """Set published=false for all rows in published_tasks. Returns rows updated."""
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE published_tasks
+                    SET published = FALSE,
+                        updated_at = NOW()
+                    WHERE published = TRUE
+                    """
+                )
+                return cur.rowcount or 0
+    finally:
+        con.close()
+
+
+def get_setting(key: str) -> str | None:
+    """Return a workshop_settings value, or None if missing."""
+    con = _conn()
+    try:
+        with con.cursor() as cur:
+            cur.execute(
+                """
+                SELECT value
+                FROM   workshop_settings
+                WHERE  key = %s
+                """,
+                (key,),
+            )
+            row = cur.fetchone()
+        if not row:
+            return None
+        value = row[0]
+        return str(value) if value is not None else None
+    finally:
+        con.close()
+
+
+def set_setting(key: str, value: str) -> None:
+    """Upsert a workshop_settings key/value."""
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO workshop_settings (key, value, updated_at)
+                    VALUES (%s, %s, NOW())
+                    ON CONFLICT (key) DO UPDATE
+                    SET value = EXCLUDED.value,
+                        updated_at = NOW()
+                    """,
+                    (key, value),
+                )
+    finally:
+        con.close()
+
+
 def get_task_overrides(task_id: str) -> dict[str, Any]:
     """Return sparse field overrides for one task (empty dict if none)."""
     con = _conn()
@@ -342,7 +403,7 @@ def get_master_leaderboard(
         placeholders = ", ".join(["%s"] * len(task_ids))
         params: list[Any] = []
 
-        where_parts = [f"task_id IN ({placeholders})"]
+        where_parts = [f"task_id IN ({placeholders})", "student_name <> 'Admin'"]
         params.extend(task_ids)
         if since is not None:
             where_parts.append("submitted_at >= %s")

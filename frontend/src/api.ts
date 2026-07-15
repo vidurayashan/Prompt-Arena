@@ -132,6 +132,12 @@ export interface MasterLeaderboardEntry {
   last_submitted: string;
 }
 
+export interface MasterLeaderboardResponse {
+  entries: MasterLeaderboardEntry[];
+  max_points: number;
+  task_count: number;
+}
+
 export interface LiveUser {
   student_name: string;
   last_seen: string;
@@ -224,6 +230,23 @@ export const api = {
       "admin"
     ),
 
+  getAdminSession: () =>
+    apiFetch<{ data_cutoff_after: string | null; published_count: number }>(
+      "/api/admin/session",
+      undefined,
+      "admin"
+    ),
+
+  resetAdminSession: (unpublishAll: boolean = true) =>
+    apiFetch<{ data_cutoff_after: string; unpublished: number }>(
+      "/api/admin/reset-session",
+      {
+        method: "POST",
+        body: JSON.stringify({ unpublish_all: unpublishAll }),
+      },
+      "admin"
+    ),
+
   getTask: (taskId: string) => apiFetch<TaskDetail>(`/api/tasks/${taskId}`),
 
   submitPrompt: (taskId: string, studentName: string, prompt: string) =>
@@ -267,7 +290,7 @@ export const api = {
   },
 
   getMasterLeaderboard: (limit: number = 50) =>
-    apiFetch<MasterLeaderboardEntry[]>(`/api/master-leaderboard?limit=${encodeURIComponent(String(limit))}`),
+    apiFetch<MasterLeaderboardResponse>(`/api/master-leaderboard?limit=${encodeURIComponent(String(limit))}`),
 
   presencePing: (studentName: string) =>
     apiFetch<{ ok: boolean }>("/api/presence/ping", {

@@ -144,6 +144,7 @@ export default function TaskListPage() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("activities");
   const [masterLb, setMasterLb] = useState<MasterLeaderboardEntry[]>([]);
+  const [masterLbMaxPoints, setMasterLbMaxPoints] = useState(0);
   const [masterLbLoading, setMasterLbLoading] = useState(false);
   const [masterLbError, setMasterLbError] = useState("");
   const [prompts, setPrompts] = useState<StudentPromptEntry[]>([]);
@@ -162,6 +163,10 @@ export default function TaskListPage() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<EditFormState | null>(null);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
+  const [sessionCutoff, setSessionCutoff] = useState<string | null>(null);
+  const [sessionPublishedCount, setSessionPublishedCount] = useState(0);
+  const [resettingSession, setResettingSession] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
   const navigate = useNavigate();
   const isAdmin = isAdminSession();
 
@@ -196,15 +201,57 @@ export default function TaskListPage() {
       .finally(() => setAdminTasksLoading(false));
   }, [isAdmin]);
 
+  const fetchAdminSession = useCallback(() => {
+    if (!isAdmin) return;
+    api
+      .getAdminSession()
+      .then((res) => {
+        setSessionCutoff(res.data_cutoff_after);
+        setSessionPublishedCount(res.published_count);
+      })
+      .catch(() => {
+        // best-effort; workshop list still works without session status
+      });
+  }, [isAdmin]);
+
   useEffect(() => {
-    if (activeTab === "workshop" && isAdmin) fetchAdminTasks();
-  }, [activeTab, isAdmin, fetchAdminTasks]);
+    if (activeTab === "workshop" && isAdmin) {
+      fetchAdminTasks();
+      fetchAdminSession();
+    }
+  }, [activeTab, isAdmin, fetchAdminTasks, fetchAdminSession]);
 
   useEffect(() => {
     if (!isAdmin && (activeTab === "prompts" || activeTab === "workshop")) {
       setActiveTab("activities");
     }
   }, [isAdmin, activeTab]);
+
+  async function handleResetSession() {
+    const ok = window.confirm(
+      "This will clear leaderboards and student prompts for everyone using this app, and unpublish all tasks. Students should refresh or rejoin. Continue?"
+    );
+    if (!ok) return;
+    setResettingSession(true);
+    setResetMessage("");
+    setAdminTasksError("");
+    try {
+      const res = await api.resetAdminSession(true);
+      setSessionCutoff(res.data_cutoff_after);
+      setSessionPublishedCount(0);
+      setResetMessage(
+        `Session reset. Leaderboards start from ${new Date(res.data_cutoff_after).toLocaleString()}. Unpublished ${res.unpublished} task(s).`
+      );
+      await fetchAdminTasks();
+      const published = await api.listTasks();
+      setTasks(published);
+      fetchMasterLeaderboard();
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to reset session");
+    } finally {
+      setResettingSession(false);
+    }
+  }
 
   async function handleTogglePublished(task: AdminTask) {
     setTogglingTaskId(task.id);
@@ -374,7 +421,10 @@ export default function TaskListPage() {
     setMasterLbError("");
     api
       .getMasterLeaderboard(50)
-      .then(setMasterLb)
+      .then((res) => {
+        setMasterLb(res.entries);
+        setMasterLbMaxPoints(res.max_points);
+      })
       .catch((err: unknown) =>
         setMasterLbError(err instanceof Error ? err.message : "Failed to load master leaderboard")
       )
@@ -570,7 +620,9 @@ export default function TaskListPage() {
 
                         <div className="lb-score">
                           {entry.total_points}
-                          <span style={{ fontSize: "11px", color: "var(--ink4)", fontWeight: 400 }}>/700</span>
+                          <span style={{ fontSize: "11px", color: "var(--ink4)", fontWeight: 400 }}>
+                            /{masterLbMaxPoints}
+                          </span>
                         </div>
 
                         <div className="lb-acts" style={{ color: "var(--ink3)" }}>
@@ -597,6 +649,42 @@ export default function TaskListPage() {
                 Changes are stored in Supabase as overrides on top of <code>config.yaml</code> — no redeploy needed.
                 Use <strong>Reset to config.yaml</strong> to clear overrides for a task.
               </p>
+
+              <div
+                className="act-card"
+                style={{ marginBottom: "1.25rem", border: "1px solid var(--red-b, #f5c2cb)" }}
+              >
+                <div className="act-title" style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+                  New class session
+                </div>
+                <p style={{ fontSize: 13, color: "var(--ink3)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                  {sessionCutoff
+                    ? <>Current leaderboard cutoff: <strong>{new Date(sessionCutoff).toLocaleString()}</strong></>
+                    : <>Showing all historical submissions (no session cutoff set).</>}
+                  {" "}
+                  Published tasks: <strong>{sessionPublishedCount}</strong>.
+                  Any lecturer with admin access shares this app — reset affects everyone.
+                </p>
+                {resetMessage && (
+                  <div style={{ fontSize: 13, color: "var(--green, #15803d)", marginBottom: "0.75rem" }}>
+                    {resetMessage}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  disabled={resettingSession}
+                  onClick={handleResetSession}
+                  style={{ borderColor: "var(--red, #c8102e)", color: "var(--red, #c8102e)" }}
+                >
+                  {resettingSession ? "Resetting…" : "Reset for new class"}
+                </button>
+                <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: "0.5rem" }}>
+                  Soft-clears leaderboards and Student Prompts from this moment, and unpublishes all tasks.
+                  Ask students to refresh or rejoin so their local points match.
+                </div>
+              </div>
+
               {adminTasksError && <div className="error-msg">{adminTasksError}</div>}
               {adminTasksLoading && <div className="spinner" />}
               {!adminTasksLoading && adminTasks.length === 0 && !adminTasksError && (
