@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import type { ChatMessage, LeaderboardEntry, SubmissionAttempt, SubmitResponse, TaskDetail } from "../api";
-import Navbar from "../components/Navbar";
+import Navbar, { SCORE_UPDATED_EVENT } from "../components/Navbar";
 import ScoreDisplay from "../components/ScoreDisplay";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -94,6 +94,7 @@ export default function TaskDetailPage() {
           localStorage.setItem("taskBests", JSON.stringify(stored));
         } catch { /* ignore */ }
       }
+      window.dispatchEvent(new Event(SCORE_UPDATED_EVENT));
       refreshSideData();
       setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     } catch (err: unknown) {
@@ -400,6 +401,7 @@ export default function TaskDetailPage() {
                         // ignore
                       }
                     }
+                    window.dispatchEvent(new Event(SCORE_UPDATED_EVENT));
                     refreshSideData();
                     setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
                   } catch (err: unknown) {

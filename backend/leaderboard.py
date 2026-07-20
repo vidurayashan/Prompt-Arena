@@ -441,3 +441,60 @@ def get_master_leaderboard(
         return [dict(row) for row in rows]
     finally:
         con.close()
+
+
+def get_student_total(
+    student_name: str,
+    task_ids: list[str],
+    since: datetime | None = None,
+) -> dict[str, Any]:
+    """
+    Return one student's sum of best scores across the selected tasks.
+
+    Keys: total_points, tasks_completed.
+    """
+    if not task_ids:
+        return {"total_points": 0, "tasks_completed": 0}
+
+    con = _conn()
+    try:
+        placeholders = ", ".join(["%s"] * len(task_ids))
+        params: list[Any] = [student_name]
+        params.extend(task_ids)
+
+        where_parts = [
+            "student_name = %s",
+            f"task_id IN ({placeholders})",
+        ]
+        if since is not None:
+            where_parts.append("submitted_at >= %s")
+            params.append(since)
+        where_sql = " AND ".join(where_parts)
+
+        with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                f"""
+                WITH best_per_task AS (
+                  SELECT
+                    task_id,
+                    MAX(score) AS best_score
+                  FROM scores
+                  WHERE {where_sql}
+                  GROUP BY task_id
+                )
+                SELECT
+                  COALESCE(SUM(best_score), 0) AS total_points,
+                  COUNT(*)                     AS tasks_completed
+                FROM best_per_task
+                """,
+                params,
+            )
+            row = cur.fetchone()
+        if not row:
+            return {"total_points": 0, "tasks_completed": 0}
+        return {
+            "total_points": int(row["total_points"] or 0),
+            "tasks_completed": int(row["tasks_completed"] or 0),
+        }
+    finally:
+        con.close()

@@ -32,15 +32,16 @@ judge_temperature: 0.0
 # Leave blank or remove to include all historical data.
 # data_cutoff_after: "2026-03-18 23:00:24.805457+00"
 
-# Master leaderboard: sum of best scores across selected tasks
-master_leaderboard_task_ids:
-  - task_snack_brand_prompt
-  - task_customer_email_emotion
-  - chat_snack_cafe_social_media
-  - task_chain_of_thought_enterprise_billing
-  - task_interview_pattern_job_description
-  - task_playoff_method_tagline
-  - task_tree_of_thought_expansion
+# Master / global leaderboard now sums best scores across ALL currently published
+# tasks (see GET /api/master-leaderboard). This list is unused; kept for reference.
+# master_leaderboard_task_ids:
+#   - task_snack_brand_prompt
+#   - task_customer_email_emotion
+#   - chat_snack_cafe_social_media
+#   - task_chain_of_thought_enterprise_billing
+#   - task_interview_pattern_job_description
+#   - task_playoff_method_tagline
+#   - task_tree_of_thought_expansion
 
 # Global judge persona: "strict" or "generous"
 #   strict   - detailed partial-credit rubric; zeros for wrong figures or missing identifiers

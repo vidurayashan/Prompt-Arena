@@ -231,9 +231,19 @@ export const api = {
     ),
 
   getAdminSession: () =>
-    apiFetch<{ data_cutoff_after: string | null; published_count: number }>(
-      "/api/admin/session",
-      undefined,
+    apiFetch<{
+      data_cutoff_after: string | null;
+      published_count: number;
+      pre_prompt_judge_enabled: boolean;
+    }>("/api/admin/session", undefined, "admin"),
+
+  setIntegrityJudgeEnabled: (enabled: boolean) =>
+    apiFetch<{ pre_prompt_judge_enabled: boolean }>(
+      "/api/admin/session/integrity-judge",
+      {
+        method: "PUT",
+        body: JSON.stringify({ enabled }),
+      },
       "admin"
     ),
 
@@ -288,6 +298,11 @@ export const api = {
       "admin"
     );
   },
+
+  getMyTotal: (studentName: string) =>
+    apiFetch<{ total_points: number; max_points: number; task_count: number }>(
+      `/api/my-total?student=${encodeURIComponent(studentName)}`
+    ),
 
   getMasterLeaderboard: (limit: number = 50) =>
     apiFetch<MasterLeaderboardResponse>(`/api/master-leaderboard?limit=${encodeURIComponent(String(limit))}`),

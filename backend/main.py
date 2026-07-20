@@ -80,6 +80,10 @@ class ResetSessionRequest(BaseModel):
     unpublish_all: bool = True
 
 
+class SetIntegrityJudgeRequest(BaseModel):
+    enabled: bool
+
+
 class PresencePingRequest(BaseModel):
     student_name: str
 
@@ -323,6 +327,27 @@ def _pre_prompt_rejected_message(cfg: dict[str, Any]) -> str:
     return _DEFAULT_PRE_PROMPT_REJECTED_MESSAGE
 
 
+def _pre_prompt_judge_enabled() -> bool:
+    """Live workshop setting; missing key means enabled (default on)."""
+    raw = leaderboard.get_setting("pre_prompt_judge_enabled")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in ("false", "0", "off", "no")
+
+
+def _published_config_task_ids(cfg: dict[str, Any]) -> list[str]:
+    """Config task IDs that are currently published (order follows config.yaml)."""
+    published = leaderboard.get_published_task_ids()
+    ids: list[str] = []
+    for task in cfg.get("tasks", []):
+        if not isinstance(task, dict):
+            continue
+        tid = task.get("id")
+        if isinstance(tid, str) and tid.strip() and tid in published:
+            ids.append(tid)
+    return ids
+
+
 def _run_pre_prompt_integrity_check(
     *,
     cfg: dict[str, Any],
@@ -335,6 +360,8 @@ def _run_pre_prompt_integrity_check(
     Run the pre-prompt integrity judge.
     Returns None if clean / unavailable; returns {"flagged": True, "reason": ...} if blocked.
     """
+    if not _pre_prompt_judge_enabled():
+        return None
     judge_prompt = _effective_pre_prompt_judge_prompt(task, cfg)
     if not judge_prompt or not student_prompt.strip():
         return None
@@ -705,7 +732,18 @@ def admin_get_session(_: None = Depends(require_admin)) -> dict[str, Any]:
     return {
         "data_cutoff_after": cutoff_raw,
         "published_count": len(published),
+        "pre_prompt_judge_enabled": _pre_prompt_judge_enabled(),
     }
+
+
+@app.put("/api/admin/session/integrity-judge")
+def admin_set_integrity_judge(
+    body: SetIntegrityJudgeRequest,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    """Enable or disable the pre-prompt integrity judge for the workshop."""
+    leaderboard.set_setting("pre_prompt_judge_enabled", "true" if body.enabled else "false")
+    return {"pre_prompt_judge_enabled": body.enabled}
 
 
 @app.post("/api/admin/reset-session")
@@ -1020,11 +1058,16 @@ def get_student_prompts(
         offset=offset,
         since=since,
     )
+    tasks_by_id: dict[str, dict[str, Any]] = {}
+    for t in cfg.get("tasks", []):
+        if isinstance(t, dict) and isinstance(t.get("id"), str):
+            tasks_by_id[t["id"]] = t
+    all_overrides = leaderboard.get_all_task_overrides()
     result = []
     for row in rows:
-        task = config_loader.get_task(row["task_id"])
+        task = tasks_by_id.get(row["task_id"])
         if task is not None:
-            overrides = leaderboard.get_task_overrides(row["task_id"])
+            overrides = all_overrides.get(row["task_id"])
             if overrides:
                 task = _apply_overrides(task, overrides)
         task_name = task["name"] if task else row["task_id"]
@@ -1039,33 +1082,36 @@ def get_student_prompts(
     return result
 
 
+@app.get("/api/my-total")
+def get_my_total(
+    student: str = Query(..., description="Student display name, e.g. First (12345678)"),
+) -> dict[str, Any]:
+    """Sum of this student's best scores across all currently published tasks."""
+    name = _validate_student_name(student)
+    cfg = config_loader.get_config()
+    since = _data_cutoff_since(cfg)
+    task_ids = _published_config_task_ids(cfg)
+    task_count = len(task_ids)
+    max_points = task_count * 100
+    if not task_ids:
+        return {"total_points": 0, "max_points": 0, "task_count": 0}
+    totals = leaderboard.get_student_total(name, task_ids=task_ids, since=since)
+    return {
+        "total_points": int(totals.get("total_points") or 0),
+        "max_points": max_points,
+        "task_count": task_count,
+    }
+
+
 @app.get("/api/master-leaderboard")
 def get_master_leaderboard(
     limit: int = Query(50, ge=1, le=200),
 ) -> dict[str, Any]:
+    """Global leaderboard: sum of best scores across all currently published tasks."""
     cfg = config_loader.get_config()
     since = _data_cutoff_since(cfg)
 
-    task_ids_raw = cfg.get("master_leaderboard_task_ids", [])
-    if task_ids_raw is None:
-        return {"entries": [], "max_points": 0, "task_count": 0}
-    if not isinstance(task_ids_raw, list) or any(not isinstance(x, str) for x in task_ids_raw):
-        raise HTTPException(status_code=500, detail="Invalid config master_leaderboard_task_ids: must be a list of strings")
-    configured_ids = [x.strip() for x in task_ids_raw if x and x.strip()]
-    if not configured_ids:
-        return {"entries": [], "max_points": 0, "task_count": 0}
-
-    # Validate task IDs exist in config.yaml (catch typos early)
-    known_ids = {t.get("id") for t in cfg.get("tasks", []) if isinstance(t, dict)}
-    unknown = [tid for tid in configured_ids if tid not in known_ids]
-    if unknown:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Unknown task IDs in master_leaderboard_task_ids: {', '.join(unknown)}",
-        )
-
-    published = leaderboard.get_published_task_ids()
-    task_ids = [tid for tid in configured_ids if tid in published]
+    task_ids = _published_config_task_ids(cfg)
     task_count = len(task_ids)
     max_points = task_count * 100
     if not task_ids:

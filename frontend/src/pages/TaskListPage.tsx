@@ -165,6 +165,8 @@ export default function TaskListPage() {
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [sessionCutoff, setSessionCutoff] = useState<string | null>(null);
   const [sessionPublishedCount, setSessionPublishedCount] = useState(0);
+  const [integrityJudgeEnabled, setIntegrityJudgeEnabled] = useState(true);
+  const [togglingIntegrity, setTogglingIntegrity] = useState(false);
   const [resettingSession, setResettingSession] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
   const navigate = useNavigate();
@@ -208,6 +210,7 @@ export default function TaskListPage() {
       .then((res) => {
         setSessionCutoff(res.data_cutoff_after);
         setSessionPublishedCount(res.published_count);
+        setIntegrityJudgeEnabled(res.pre_prompt_judge_enabled);
       })
       .catch(() => {
         // best-effort; workshop list still works without session status
@@ -250,6 +253,20 @@ export default function TaskListPage() {
       setAdminTasksError(err instanceof Error ? err.message : "Failed to reset session");
     } finally {
       setResettingSession(false);
+    }
+  }
+
+  async function handleToggleIntegrityJudge() {
+    const next = !integrityJudgeEnabled;
+    setTogglingIntegrity(true);
+    setAdminTasksError("");
+    try {
+      const res = await api.setIntegrityJudgeEnabled(next);
+      setIntegrityJudgeEnabled(res.pre_prompt_judge_enabled);
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to update integrity judge");
+    } finally {
+      setTogglingIntegrity(false);
     }
   }
 
@@ -408,9 +425,14 @@ export default function TaskListPage() {
       .finally(() => setPromptsLoading(false));
   }, [promptTaskId, promptStudentFilter, isAdmin]);
 
+  // Refetch when tab opens or activity filter changes; debounce student name typing.
   useEffect(() => {
-    if (activeTab === "prompts" && isAdmin) fetchPrompts();
-  }, [activeTab, fetchPrompts, isAdmin]);
+    if (activeTab !== "prompts" || !isAdmin) return;
+    const timer = window.setTimeout(() => {
+      fetchPrompts();
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, isAdmin, promptTaskId, promptStudentFilter, fetchPrompts]);
 
   useEffect(() => {
     if (isAdmin && adminTasks.length === 0) fetchAdminTasks();
@@ -576,14 +598,14 @@ export default function TaskListPage() {
             <div className="lb-wrap" style={{ width: "min(980px, 100%)", margin: "0 auto" }}>
               <div className="lb-head">
                 <h3>Master Leaderboard (total points)</h3>
-                <span>Sum of best scores across selected activities</span>
+                <span>Sum of best scores across all published activities</span>
               </div>
 
               {masterLbLoading && <div className="spinner" />}
               {masterLbError && <div className="error-msg">{masterLbError}</div>}
 
               {!masterLbLoading && !masterLbError && masterLb.length === 0 && (
-                <div className="lb-empty">No in-class submissions yet (for the selected master activities).</div>
+                <div className="lb-empty">No in-class submissions yet (for published activities).</div>
               )}
 
               {!masterLbLoading && !masterLbError && masterLb.length > 0 && (
@@ -683,6 +705,39 @@ export default function TaskListPage() {
                   Soft-clears leaderboards and Student Prompts from this moment, and unpublishes all tasks.
                   Ask students to refresh or rejoin so their local points match.
                 </div>
+              </div>
+
+              <div
+                className="act-card"
+                style={{ marginBottom: "1.25rem" }}
+              >
+                <div className="act-title" style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+                  Integrity judge
+                </div>
+                <p style={{ fontSize: 13, color: "var(--ink3)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                  When enabled, submissions are checked for answer-dumping before scoring.
+                  Rejected prompts still count as an attempt with score 0.
+                </p>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    fontSize: 14,
+                    cursor: togglingIntegrity ? "wait" : "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={integrityJudgeEnabled}
+                    disabled={togglingIntegrity}
+                    onChange={handleToggleIntegrityJudge}
+                  />
+                  <span>
+                    {integrityJudgeEnabled ? "Enabled" : "Disabled"}
+                    {togglingIntegrity ? "…" : ""}
+                  </span>
+                </label>
               </div>
 
               {adminTasksError && <div className="error-msg">{adminTasksError}</div>}

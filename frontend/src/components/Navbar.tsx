@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, clearSession, isAdminSession } from "../api";
 
+export const SCORE_UPDATED_EVENT = "score-updated";
+
 function getInitials(displayName: string): string {
   const parts = displayName.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -10,38 +12,39 @@ function getInitials(displayName: string): string {
   return displayName.slice(0, 2).toUpperCase();
 }
 
-function getPublishedTotalScore(publishedIds: string[]): number {
-  try {
-    const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
-    return publishedIds.reduce((sum, id) => sum + (Number(stored[id]) || 0), 0);
-  } catch {
-    return 0;
-  }
-}
-
 export default function Navbar() {
   const navigate = useNavigate();
   const name = localStorage.getItem("studentName") ?? "";
   const admin = isAdminSession();
-  const [publishedTaskIds, setPublishedTaskIds] = useState<string[]>([]);
+  const [totalScore, setTotalScore] = useState(0);
   const initials = name ? getInitials(name) : admin ? "AD" : "?";
-  const totalScore = getPublishedTotalScore(publishedTaskIds);
 
   useEffect(() => {
-    if (admin) return;
+    if (admin || !name) {
+      setTotalScore(0);
+      return;
+    }
     let cancelled = false;
-    api
-      .listTasks()
-      .then((tasks) => {
-        if (!cancelled) setPublishedTaskIds(tasks.map((t) => t.id));
-      })
-      .catch(() => {
-        if (!cancelled) setPublishedTaskIds([]);
-      });
+
+    function loadTotal() {
+      api
+        .getMyTotal(name)
+        .then((res) => {
+          if (!cancelled) setTotalScore(res.total_points);
+        })
+        .catch(() => {
+          if (!cancelled) setTotalScore(0);
+        });
+    }
+
+    loadTotal();
+    const onScoreUpdated = () => loadTotal();
+    window.addEventListener(SCORE_UPDATED_EVENT, onScoreUpdated);
     return () => {
       cancelled = true;
+      window.removeEventListener(SCORE_UPDATED_EVENT, onScoreUpdated);
     };
-  }, [admin]);
+  }, [admin, name]);
 
   function handleLogout() {
     clearSession();
