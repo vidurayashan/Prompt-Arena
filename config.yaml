@@ -104,8 +104,12 @@ tasks:
     name: "Task 1: Patient Medical Report"
     task_type: "Document"
     description: >
-      Below is a patient medical report. Write a prompt that instructs the AI
-      to extract the required information from this document as accurately as possible.
+      A clinic has roughly 1,000 patient medical reports that must be entered into
+      its new IT system. Doing this by hand would take months. As the business
+      analyst on the project, you have proposed a GenAI solution to extract key
+      fields automatically. You have been given a sample medical report — write a
+      prompt that instructs the AI to extract the required information as
+      accurately as possible.
     document: "documents/sample_medical_report.pdf"
     items:
       - id: 1
@@ -128,8 +132,12 @@ tasks:
     name: "Task 2: Research Paper Abstract"
     task_type: "Document"
     description: >
-      You have been given a research paper abstract. Write a prompt to make the
-      AI extract the key information listed below from the abstract.
+      A university research office has roughly 1,000 paper abstracts that must be
+      catalogued into its new research repository. Manual entry would take months.
+      As the business analyst on the project, you have proposed a GenAI solution
+      to extract key fields automatically. You have been given a sample abstract —
+      write a prompt that instructs the AI to extract the key information listed
+      below.
     document: "documents/sample_abstract.pdf"
     items:
       - id: 1
@@ -152,7 +160,12 @@ tasks:
     name: "Task 3: Vantara Insurance Policy Information Extraction"
     task_type: "Document"
     description: >
-      Write a prompt to extract the required information from this insurance policy document.
+      An insurer is migrating roughly 1,000 policy documents into a new policy
+      administration system. Manual data entry would take months. As the business
+      analyst on the project, you have proposed a GenAI solution to extract the
+      required fields automatically. You have been given a sample insurance policy —
+      write a prompt that instructs the AI to extract the required information from
+      this document.
     document: "documents/VantaraInsurancePolicy_VLG2024HCP00847.pdf"
     items:
 
@@ -734,9 +747,13 @@ tasks:
     name: "Task 4: Meridian Commercial Facility Agreement Information Extraction"
     task_type: "Document"
     description: >
-      Write a prompt to extract the required information from this commercial
-      facility agreement. Be precise — many facts are buried within long
-      paragraphs, and decoy numbers appear near the correct answers.
+      A commercial bank is onboarding roughly 1,000 facility agreements into its
+      new credit operations system. Manual entry would take months. As the
+      business analyst on the project, you have proposed a GenAI solution to
+      extract key terms automatically. You have been given a sample commercial
+      facility agreement — write a prompt that extracts the required information.
+      Be precise: many facts are buried within long paragraphs, and decoy numbers
+      appear near the correct answers.
     document: "documents/MeridianFacilityAgreement_MCB2024CFA00312.pdf"
     judge_persona: "generous"
     items:

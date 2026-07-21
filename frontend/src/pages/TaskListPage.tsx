@@ -116,7 +116,7 @@ const HERO_PILLS = [
 const BADGE_COLORS = ["b-red", "b-purple", "b-teal", "b-amber", "b-blue", "b-green", "b-purple"];
 
 const DEFAULT_ACTIVITY_STEPS = [
-  { verb: "Download", text: "the reference document and read it carefully." },
+  { verb: "Have a look", text: "at the sample document." },
   { verb: "Write", text: "a prompt that instructs the AI to extract the required information." },
   { verb: "Submit", text: "and see how you score on the live leaderboard." },
 ];

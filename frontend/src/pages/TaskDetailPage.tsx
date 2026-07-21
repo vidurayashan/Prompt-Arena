@@ -177,9 +177,9 @@ export default function TaskDetailPage() {
         {isDocumentTask && task.document_filename && (
           <div className="card mb-2" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, marginBottom: ".2rem" }}>Reference document</div>
+              <div style={{ fontWeight: 600, marginBottom: ".2rem" }}>Sample document</div>
               <div style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>
-                {task.document_filename} — download and read this before writing your prompt
+                {task.document_filename} — have a look at this sample document before writing your prompt
               </div>
             </div>
             <a
