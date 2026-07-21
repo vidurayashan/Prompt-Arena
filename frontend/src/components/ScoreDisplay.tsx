@@ -11,6 +11,64 @@ function rowClass(score: number): string {
   return "score-item-row zero";
 }
 
+function FourPillarsBlock({ result }: { result: SubmitResponse }) {
+  if (!result.four_pillars || Object.keys(result.four_pillars).length === 0) {
+    return null;
+  }
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "0.75rem",
+        background: "var(--bg-subtle, #f8f9fa)",
+        marginTop: "1rem",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: "0.75rem",
+          marginBottom: ".35rem",
+        }}
+      >
+        <div style={{ fontWeight: 700 }}>Score for prompting best practices (Four Pillars)</div>
+        {result.four_pillars_overall != null && (
+          <div style={{ fontWeight: 700, fontSize: ".95rem" }}>
+            {result.four_pillars_overall.toFixed(1)}/5
+          </div>
+        )}
+      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr max-content",
+          gap: ".35rem .75rem",
+          fontSize: ".9rem",
+        }}
+      >
+        {Object.entries(result.four_pillars).map(([k, v]) => (
+          <div key={k} style={{ display: "contents" }}>
+            <div style={{ color: "var(--text-muted)", fontWeight: 600 }}>{k}</div>
+            <div style={{ fontWeight: 700 }}>
+              {v.score}/{v.max}
+            </div>
+          </div>
+        ))}
+      </div>
+      {result.four_pillars_feedback && (
+        <div style={{ marginTop: ".6rem", fontSize: ".9rem" }}>
+          <div style={{ fontWeight: 700, marginBottom: ".2rem" }}>Top improvement suggestion</div>
+          <div style={{ color: "var(--text-muted)" }}>{result.four_pillars_feedback}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ScoreDisplay({ result }: Props) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -40,6 +98,8 @@ export default function ScoreDisplay({ result }: Props) {
           </div>
         </div>
       </div>
+
+      <FourPillarsBlock result={result} />
 
       {/* Per-item breakdown */}
       {result.scores.length === 0 ? (

@@ -100,6 +100,9 @@ export interface SubmitResponse {
   judge_breakdown?: Record<string, { score: number; max: number }> | null;
   judge_feedback?: string | null;
   prompt_rejected?: boolean;
+  four_pillars?: Record<string, { score: number; max: number }> | null;
+  four_pillars_feedback?: string | null;
+  four_pillars_overall?: number | null;
 }
 
 export interface LeaderboardEntry {
@@ -235,11 +238,22 @@ export const api = {
       data_cutoff_after: string | null;
       published_count: number;
       pre_prompt_judge_enabled: boolean;
+      four_pillars_enabled: boolean;
     }>("/api/admin/session", undefined, "admin"),
 
   setIntegrityJudgeEnabled: (enabled: boolean) =>
     apiFetch<{ pre_prompt_judge_enabled: boolean }>(
       "/api/admin/session/integrity-judge",
+      {
+        method: "PUT",
+        body: JSON.stringify({ enabled }),
+      },
+      "admin"
+    ),
+
+  setFourPillarsEnabled: (enabled: boolean) =>
+    apiFetch<{ four_pillars_enabled: boolean }>(
+      "/api/admin/session/four-pillars",
       {
         method: "PUT",
         body: JSON.stringify({ enabled }),

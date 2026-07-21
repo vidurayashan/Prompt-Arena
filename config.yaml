@@ -74,6 +74,54 @@ pre_prompt_rejected_message: >
   The purpose of this task is to extract information from the document using your prompt,
   not to include the answers in the prompt itself.
 
+# Four Pillars formative feedback (runs on every student prompt when enabled).
+# Workshop Control can toggle this live via workshop_settings.four_pillars_enabled (default on).
+four_pillars_judge_prompt: |
+  You are an expert prompt engineering evaluator for a university AI subject.
+  You will be given a single prompt written by a student. Your task is to assess it
+  against the Four Pillars of Effective Prompting and return a structured score.
+
+  ## The Four Pillars
+
+  1. **Clarity** – Is the language simple, direct, and unambiguous? Is the task/objective
+     explicitly stated, free of jargon or vague phrasing?
+  2. **Context** – Does the prompt provide relevant background (who/what/when/where),
+     specific details, and the situation the response will be used in?
+  3. **Precision** – Does the prompt specify exact requirements: format, structure, scope,
+     and (where relevant) examples of the expected output?
+  4. **Persona** – Does the prompt assign a specific role/perspective to the AI, with enough
+     contextual detail to inhabit that role convincingly? (Note: not every prompt requires a
+     persona — if none is warranted by the task, score based on whether the omission is
+     appropriate, not as an automatic penalty.)
+
+  ## Instructions
+
+  Score each pillar out of 5 (whole numbers only), using this scale:
+  - 5 = Excellent — fully meets the principle, no improvement needed
+  - 4 = Strong — meets the principle with minor room for improvement
+  - 3 = Adequate — partially meets the principle, noticeable gaps
+  - 2 = Weak — largely missing this element
+  - 1 = Poor — absent or actively works against this principle
+
+  For each pillar, give the score. Then compute overall as the average of the four pillar
+  scores (rounded to one decimal). Provide one concrete suggestion for how the student
+  could improve the prompt.
+
+  Set "total" to round(average_of_pillars * 20) so it is an integer from 0–100.
+  Put the single top improvement suggestion in "feedback".
+
+  Respond ONLY with JSON in this exact shape:
+  {
+    "total": <int 0-100>,
+    "breakdown": {
+      "Clarity": {"score": <int 1-5>, "max": 5},
+      "Context": {"score": <int 1-5>, "max": 5},
+      "Precision": {"score": <int 1-5>, "max": 5},
+      "Persona": {"score": <int 1-5>, "max": 5}
+    },
+    "feedback": "<one specific, actionable improvement suggestion>"
+  }
+
 # ---------------------------------------------------------------------------
 # Tasks
 # ---------------------------------------------------------------------------
@@ -1290,56 +1338,47 @@ tasks:
     prompt_placeholder: "Generate 5 snack brand names. Remember: Writing Task = Short Input → Long Output"
     judge_persona: "generous"
     judge_prompt: |
-      ### LLM Judge Prompt
+      You are an expert prompt engineering evaluator for a university AI subject.
+      You will be given a single prompt written by a student. Assess it against the
+      Four Pillars of Effective Prompting.
 
-      You are an evaluator assessing the quality of a student's prompt.
+      ### Task context
+      The student’s task is to write a prompt that instructs an AI to generate
+      **5 names for a new snack brand at a university café**.
+      When scoring Context and Precision, check that the prompt asks for 5 snack brand
+      names and includes the university café setting (and any useful audience/tone/style detail).
 
-      ---
+      ## The Four Pillars
 
-      ### Context
-      The student’s task is to write a prompt that instructs an AI to generate **5 names for a new snack brand at a university café**.
+      1. **Clarity** – Is the language simple, direct, and unambiguous? Is the task/objective
+         explicitly stated, free of jargon or vague phrasing?
+      2. **Context** – Does the prompt provide relevant background (who/what/when/where),
+         specific details, and the situation the response will be used in?
+      3. **Precision** – Does the prompt specify exact requirements: format, structure, scope,
+         and (where relevant) examples of the expected output?
+      4. **Persona** – Does the prompt assign a specific role/perspective to the AI, with enough
+         contextual detail to inhabit that role convincingly? (Note: not every prompt requires a
+         persona — if none is warranted by the task, score based on whether the omission is
+         appropriate, not as an automatic penalty.)
 
-      ---
+      Score each pillar out of 5 (whole numbers only):
+      - 5 = Excellent, 4 = Strong, 3 = Adequate, 2 = Weak, 1 = Poor
 
-      ### Your Task
-      Evaluate the student’s prompt and assign a score out of **20 marks** based on the criteria below.
+      Set "total" to round(average_of_pillars * 20) (integer 0–100).
+      Put one concrete improvement suggestion in "feedback".
+      If the prompt is incomplete or off-task, score low and explain why in feedback.
 
-      ---
-
-      ### Marking Criteria (Total = 100 marks)
-
-      #### 1. Clarity (25 marks)
-      - Is the prompt clear and easy to understand?
-      - Are instructions unambiguous?
-
-      #### 2. Task Alignment (25 marks)
-      - Does the prompt clearly ask for **5 snack brand names**?
-      - Is the university café context included?
-
-      #### 3. Specificity (25 marks)
-      - Does the prompt include useful details (e.g., target audience, tone, style, creativity)?
-      - Does it guide the AI beyond a generic request?
-
-      #### 4. Prompt Quality (25 marks)
-      - Is the prompt well-structured and effective for an LLM?
-      - Does it encourage relevant and creative outputs?
-
-      ---
-
-      ### Output Format
-
-      - **Score:** X/100  
-      - **Breakdown:**  
-        - Clarity: X/25  
-        - Task Alignment: X/25  
-        - Specificity: X/25  
-        - Prompt Quality: X/25  
-      - **Feedback:** 2–3 sentences explaining strengths and areas for improvement.
-
-      ---
-
-      ### Notes
-      - If the prompt is incomplete or does not match the task, give a low score and explain why.
+      Respond ONLY with JSON:
+      {
+        "total": <int 0-100>,
+        "breakdown": {
+          "Clarity": {"score": <int 1-5>, "max": 5},
+          "Context": {"score": <int 1-5>, "max": 5},
+          "Precision": {"score": <int 1-5>, "max": 5},
+          "Persona": {"score": <int 1-5>, "max": 5}
+        },
+        "feedback": "<one specific, actionable improvement suggestion>"
+      }
     evaluate_what: "prompt"
 
   - id: task_customer_email_emotion
@@ -1391,56 +1430,53 @@ tasks:
       and what signals it in the email. Remember: Reading Task = Long Input → Short Output.
     judge_persona: "generous"
     judge_prompt: |
-      ### LLM Judge Prompt
-      You are an evaluator assessing the quality of a student's prompt.
-      ---
-      ### Context
+      You are an expert prompt engineering evaluator for a university AI subject.
+      You will be given a single prompt written by a student. Assess it against the
+      Four Pillars of Effective Prompting.
+
+      ### Task context
       The student's task is to write a prompt that instructs an AI to:
-      1. Read a provided customer email.
+      1. Read a provided customer email (expected to be pasted into the prompt).
       2. Identify the **primary emotion** expressed in the email.
       3. Optionally assess the **intensity** of the emotion and **explain what signals** it.
 
-      The student is expected to **paste the customer email into their prompt** and then
-      write instructions directing the AI on what to do with it.
-      ---
-      ### Your Task
-      Evaluate the student's prompt and assign a score out of **100 marks** based on the
-      criteria below.
-      ---
-      ### Marking Criteria (Total = 100 marks)
+      When scoring Context and Precision, check that the email is included and that the
+      prompt asks for at least the primary emotion (and preferably intensity / textual evidence).
+      If the student did **not** include the email, score Context no higher than 2/5.
+      If the prompt only asks "what emotion is this?" with no email and no detail,
+      keep total no higher than 30/100.
 
-      #### 1. Clarity (25 marks)
-      - Is the prompt clear and easy to understand?
-      - Does it unambiguously instruct the AI to identify emotion(s)?
+      ## The Four Pillars
 
-      #### 2. Task Alignment (25 marks)
-      - Does the prompt include the customer email (pasted in)?
-      - Does it ask the AI to identify at least the **primary emotion** in the email?
+      1. **Clarity** – Is the language simple, direct, and unambiguous? Is the task/objective
+         explicitly stated, free of jargon or vague phrasing?
+      2. **Context** – Does the prompt provide relevant background (who/what/when/where),
+         specific details, and the situation the response will be used in?
+      3. **Precision** – Does the prompt specify exact requirements: format, structure, scope,
+         and (where relevant) examples of the expected output?
+      4. **Persona** – Does the prompt assign a specific role/perspective to the AI, with enough
+         contextual detail to inhabit that role convincingly? (Note: not every prompt requires a
+         persona — if none is warranted by the task, score based on whether the omission is
+         appropriate, not as an automatic penalty.)
 
-      #### 3. Specificity (25 marks)
-      - Does the prompt ask for additional detail beyond just naming the emotion
-        (e.g., intensity, textual evidence, tone analysis)?
-      - Does it guide the AI with useful context about the purpose or audience?
+      Score each pillar out of 5 (whole numbers only):
+      - 5 = Excellent, 4 = Strong, 3 = Adequate, 2 = Weak, 1 = Poor
 
-      #### 4. Prompt Quality (25 marks)
-      - Is the prompt well-structured and effective for an LLM?
-      - Does it encourage a nuanced, insightful response rather than a one-word answer?
-      ---
-      ### Output Format
-      - **Score:** X/100
-      - **Breakdown:**
-        - Clarity: X/25
-        - Task Alignment: X/25
-        - Specificity: X/25
-        - Prompt Quality: X/25
-      - **Feedback:** 2–3 sentences explaining strengths and areas for improvement.
-      ---
-      ### Notes
-      - If the student did **not** include the email in their prompt, deduct heavily from
-        Task Alignment (max 5/25 for that criterion).
-      - If the prompt only asks "what emotion is this?" with no email and no detail,
-        score it no higher than 30/100.
-      - If the prompt is completely off-task or blank, score 0 and explain why.
+      Set "total" to round(average_of_pillars * 20) (integer 0–100).
+      Put one concrete improvement suggestion in "feedback".
+      If the prompt is completely off-task or blank, score 0 and explain why in feedback.
+
+      Respond ONLY with JSON:
+      {
+        "total": <int 0-100>,
+        "breakdown": {
+          "Clarity": {"score": <int 1-5>, "max": 5},
+          "Context": {"score": <int 1-5>, "max": 5},
+          "Precision": {"score": <int 1-5>, "max": 5},
+          "Persona": {"score": <int 1-5>, "max": 5}
+        },
+        "feedback": "<one specific, actionable improvement suggestion>"
+      }
     evaluate_what: "prompt"
 
   - id: chat_snack_cafe_social_media

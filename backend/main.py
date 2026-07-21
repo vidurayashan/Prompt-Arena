@@ -84,6 +84,10 @@ class SetIntegrityJudgeRequest(BaseModel):
     enabled: bool
 
 
+class SetFourPillarsRequest(BaseModel):
+    enabled: bool
+
+
 class PresencePingRequest(BaseModel):
     student_name: str
 
@@ -132,6 +136,9 @@ class SubmitResponse(BaseModel):
     judge_breakdown: dict[str, JudgeBreakdownItem] | None = None
     judge_feedback: str | None = None
     prompt_rejected: bool = False
+    four_pillars: dict[str, JudgeBreakdownItem] | None = None
+    four_pillars_feedback: str | None = None
+    four_pillars_overall: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -333,6 +340,71 @@ def _pre_prompt_judge_enabled() -> bool:
     if raw is None:
         return True
     return raw.strip().lower() not in ("false", "0", "off", "no")
+
+
+def _four_pillars_enabled() -> bool:
+    """Live workshop setting; missing key means enabled (default on)."""
+    raw = leaderboard.get_setting("four_pillars_enabled")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in ("false", "0", "off", "no")
+
+
+def _run_four_pillars_eval(
+    *,
+    cfg: dict[str, Any],
+    student_prompt: str,
+    judge_key: str,
+    judge_base_url: str | None,
+) -> tuple[dict[str, JudgeBreakdownItem] | None, str | None, float | None]:
+    """
+    Formative Four Pillars feedback on the student prompt.
+    Returns (breakdown, feedback, overall/5) or (None, None, None) if disabled/unavailable.
+    Does not affect leaderboard totals.
+    """
+    if not _four_pillars_enabled():
+        return None, None, None
+    judge_prompt = cfg.get("four_pillars_judge_prompt") or ""
+    if not isinstance(judge_prompt, str) or not judge_prompt.strip():
+        return None, None, None
+    if not student_prompt.strip():
+        return None, None, None
+
+    try:
+        result = llm_client.run_prompt_judge(
+            api_key=judge_key,
+            judge_model=cfg["judge_model"],
+            judge_prompt=judge_prompt,
+            text_to_judge=student_prompt,
+            base_url=judge_base_url,
+            temperature=cfg.get("judge_temperature"),
+        )
+    except Exception:
+        # Formative only — never fail the main submission path
+        return None, None, None
+
+    raw_breakdown = result.get("breakdown")
+    if not isinstance(raw_breakdown, dict) or not raw_breakdown:
+        return None, None, None
+
+    pillars: dict[str, JudgeBreakdownItem] = {}
+    scores: list[float] = []
+    for key, val in raw_breakdown.items():
+        if not isinstance(val, dict):
+            continue
+        score = val.get("score")
+        max_score = val.get("max")
+        if isinstance(score, int) and isinstance(max_score, int) and max_score > 0:
+            pillars[str(key)] = JudgeBreakdownItem(score=score, max=max_score)
+            scores.append(score / max_score * 5)
+
+    if not pillars:
+        return None, None, None
+
+    overall = round(sum(scores) / len(scores), 1) if scores else None
+    feedback = result.get("feedback")
+    feedback_str = feedback if isinstance(feedback, str) and feedback.strip() else None
+    return pillars, feedback_str, overall
 
 
 def _published_config_task_ids(cfg: dict[str, Any]) -> list[str]:
@@ -733,6 +805,7 @@ def admin_get_session(_: None = Depends(require_admin)) -> dict[str, Any]:
         "data_cutoff_after": cutoff_raw,
         "published_count": len(published),
         "pre_prompt_judge_enabled": _pre_prompt_judge_enabled(),
+        "four_pillars_enabled": _four_pillars_enabled(),
     }
 
 
@@ -744,6 +817,16 @@ def admin_set_integrity_judge(
     """Enable or disable the pre-prompt integrity judge for the workshop."""
     leaderboard.set_setting("pre_prompt_judge_enabled", "true" if body.enabled else "false")
     return {"pre_prompt_judge_enabled": body.enabled}
+
+
+@app.put("/api/admin/session/four-pillars")
+def admin_set_four_pillars(
+    body: SetFourPillarsRequest,
+    _: None = Depends(require_admin),
+) -> dict[str, Any]:
+    """Enable or disable Four Pillars formative feedback for the workshop."""
+    leaderboard.set_setting("four_pillars_enabled", "true" if body.enabled else "false")
+    return {"four_pillars_enabled": body.enabled}
 
 
 @app.post("/api/admin/reset-session")
@@ -884,6 +967,13 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
             since=since,
         )
 
+    four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+        cfg=cfg,
+        student_prompt=body.prompt,
+        judge_key=judge_key,
+        judge_base_url=judge_base_url,
+    )
+
     if task_type == "Document":
         # 1. Extract PDF text
         doc_path = config_loader.get_document_path(task)
@@ -1018,6 +1108,9 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         judge_breakdown=judge_breakdown if isinstance(judge_breakdown, dict) else None,
         judge_feedback=judge_feedback if isinstance(judge_feedback, str) else None,
         prompt_rejected=False,
+        four_pillars=four_pillars,
+        four_pillars_feedback=four_pillars_feedback,
+        four_pillars_overall=four_pillars_overall,
     )
 
 
@@ -1217,6 +1310,13 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
             since=since,
         )
 
+    four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+        cfg=cfg,
+        student_prompt=student_prompt_text,
+        judge_key=judge_key,
+        judge_base_url=judge_base_url,
+    )
+
     try:
         judgment_simple = llm_client.run_prompt_judge(
             api_key=judge_key,
@@ -1244,6 +1344,9 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         is_new_best=is_new_best,
         judge_feedback=judgment_simple.get("feedback") if isinstance(judgment_simple.get("feedback"), str) else None,
         prompt_rejected=False,
+        four_pillars=four_pillars,
+        four_pillars_feedback=four_pillars_feedback,
+        four_pillars_overall=four_pillars_overall,
     )
 
 

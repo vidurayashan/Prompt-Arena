@@ -167,6 +167,8 @@ export default function TaskListPage() {
   const [sessionPublishedCount, setSessionPublishedCount] = useState(0);
   const [integrityJudgeEnabled, setIntegrityJudgeEnabled] = useState(true);
   const [togglingIntegrity, setTogglingIntegrity] = useState(false);
+  const [fourPillarsEnabled, setFourPillarsEnabled] = useState(true);
+  const [togglingFourPillars, setTogglingFourPillars] = useState(false);
   const [resettingSession, setResettingSession] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
   const navigate = useNavigate();
@@ -211,6 +213,7 @@ export default function TaskListPage() {
         setSessionCutoff(res.data_cutoff_after);
         setSessionPublishedCount(res.published_count);
         setIntegrityJudgeEnabled(res.pre_prompt_judge_enabled);
+        setFourPillarsEnabled(res.four_pillars_enabled);
       })
       .catch(() => {
         // best-effort; workshop list still works without session status
@@ -267,6 +270,20 @@ export default function TaskListPage() {
       setAdminTasksError(err instanceof Error ? err.message : "Failed to update integrity judge");
     } finally {
       setTogglingIntegrity(false);
+    }
+  }
+
+  async function handleToggleFourPillars() {
+    const next = !fourPillarsEnabled;
+    setTogglingFourPillars(true);
+    setAdminTasksError("");
+    try {
+      const res = await api.setFourPillarsEnabled(next);
+      setFourPillarsEnabled(res.four_pillars_enabled);
+    } catch (err: unknown) {
+      setAdminTasksError(err instanceof Error ? err.message : "Failed to update Four Pillars feedback");
+    } finally {
+      setTogglingFourPillars(false);
     }
   }
 
@@ -736,6 +753,39 @@ export default function TaskListPage() {
                   <span>
                     {integrityJudgeEnabled ? "Enabled" : "Disabled"}
                     {togglingIntegrity ? "…" : ""}
+                  </span>
+                </label>
+              </div>
+
+              <div
+                className="act-card"
+                style={{ marginBottom: "1.25rem" }}
+              >
+                <div className="act-title" style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+                  Four Pillars feedback
+                </div>
+                <p style={{ fontSize: 13, color: "var(--ink3)", marginBottom: "0.75rem", lineHeight: 1.5 }}>
+                  When enabled, every student prompt is scored on Clarity, Context, Precision,
+                  and Persona. This is formative feedback and does not change leaderboard totals.
+                </p>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    fontSize: 14,
+                    cursor: togglingFourPillars ? "wait" : "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={fourPillarsEnabled}
+                    disabled={togglingFourPillars}
+                    onChange={handleToggleFourPillars}
+                  />
+                  <span>
+                    {fourPillarsEnabled ? "Enabled" : "Disabled"}
+                    {togglingFourPillars ? "…" : ""}
                   </span>
                 </label>
               </div>
