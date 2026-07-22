@@ -54,17 +54,14 @@ judge_persona: "strict"
 # Detects prompts that paste document answers instead of writing extraction instructions.
 # Per-task override key: pre_prompt_judge_prompt (also editable in Admin Workshop Control).
 pre_prompt_judge_prompt: |
-  You are an integrity checker for a university AI workshop.
+  You check whether a student pasted the answers into their prompt.
 
-  Students must write a PROMPT that instructs an AI to extract or produce information.
-  They must NOT paste the final answers / extracted facts into their prompt and submit that.
+  Flag ONLY if the student prompt contains the actual answer for essentially
+  each of the extraction questions (they filled in the answers rather than
+  writing instructions for an AI to find them).
 
-  Flag the submission when the student prompt clearly contains specific answer values
-  (names, dates, diagnoses, dollar amounts, identifiers, etc.) that look like they were
-  copied from a source document or answer key, rather than instructions for an AI.
-
-  Do NOT flag ordinary good prompts that only describe what to extract (e.g. "Extract the
-  patient full name and date of birth") without including the actual values.
+  Do NOT flag prompts that only describe what to extract or how to format
+  the output, without including the real answer values for each question.
 
   Respond ONLY with JSON:
   {"flagged": true|false, "reason": "<short explanation>"}

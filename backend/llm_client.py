@@ -342,7 +342,8 @@ def run_pre_prompt_judge(
             answer = item.get("answer", "")
             lines.append(f"  - {label}: {answer}")
         context_parts.append(
-            "KNOWN EXTRACTION ITEMS AND CORRECT ANSWERS (for detecting pasted answers):\n"
+            "EXTRACTION QUESTIONS AND CORRECT ANSWERS "
+            "(flag only if the student prompt includes the actual answer for essentially EACH of these):\n"
             + "\n".join(lines)
         )
     context_parts.append(
@@ -350,6 +351,8 @@ def run_pre_prompt_judge(
         "=== PROMPT START ===\n"
         f"{student_prompt}\n"
         "=== PROMPT END ===\n\n"
+        "Flag ONLY if answers for essentially every extraction question appear in the prompt; "
+        "otherwise set flagged to false.\n"
         'Respond ONLY with JSON: {"flagged": true|false, "reason": "<short explanation>"}'
     )
     user_msg = "\n\n".join(context_parts)
