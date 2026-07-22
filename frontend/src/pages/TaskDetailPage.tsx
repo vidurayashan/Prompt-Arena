@@ -173,6 +173,25 @@ export default function TaskDetailPage() {
           </p>
         )}
 
+        {task.four_pillars_guidance && (
+          <div className="card mb-2 four-pillars-guidance">
+            <h2 style={{ margin: 0, marginBottom: ".5rem", color: "var(--blue)" }}>
+              Four Pillars of Effective Prompting
+            </h2>
+            <p
+              style={{
+                color: "var(--text-muted)",
+                fontSize: ".88rem",
+                margin: 0,
+                whiteSpace: "pre-wrap",
+                lineHeight: 1.5,
+              }}
+            >
+              {task.four_pillars_guidance}
+            </p>
+          </div>
+        )}
+
         {/* Document download (Document tasks only) */}
         {isDocumentTask && task.document_filename && (
           <div className="card mb-2" style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
@@ -228,7 +247,9 @@ export default function TaskDetailPage() {
             <h2>{task.prompt_panel_title ?? "Write your prompt"}</h2>
             <p style={{ color: "var(--text-muted)", fontSize: ".88rem", marginBottom: "1rem", whiteSpace: "pre-wrap" }}>
               {task.prompt_panel_body ??
-                "The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output."}
+                (task.four_pillars_guidance
+                  ? "The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output. Use the Four Pillars (Clarity, Context, Precision, Persona) so your prompt scores well."
+                  : "The document text will be automatically attached. Write a prompt that tells the AI what to extract and how to format the output.")}
             </p>
             <label htmlFor="prompt">Your prompt</label>
             <textarea

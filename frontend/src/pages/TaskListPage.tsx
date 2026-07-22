@@ -117,7 +117,10 @@ const BADGE_COLORS = ["b-red", "b-purple", "b-teal", "b-amber", "b-blue", "b-gre
 
 const DEFAULT_ACTIVITY_STEPS = [
   { verb: "Have a look", text: "at the sample document." },
-  { verb: "Write", text: "a prompt that instructs the AI to extract the required information." },
+  {
+    verb: "Write",
+    text: "a prompt with Clarity, Context, Precision, and Persona (the Four Pillars).",
+  },
   { verb: "Submit", text: "and see how you score on the live leaderboard." },
 ];
 
@@ -577,6 +580,12 @@ export default function TaskListPage() {
                     </div>
                   ))}
                 </div>
+
+                {task.four_pillars_guidance && (
+                  <div className="act-pillars-tip">
+                    <strong>Four Pillars:</strong> Clarity · Context · Precision · Persona — include these in your prompt (worth 50 pts on Document tasks).
+                  </div>
+                )}
 
                 <button
                   className="btn btn-primary"

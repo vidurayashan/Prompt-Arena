@@ -103,9 +103,9 @@ four_pillars_judge_prompt: |
   - 2 = Weak — largely missing this element
   - 1 = Poor — absent or actively works against this principle
 
-  For each pillar, give the score. Then compute overall as the average of the four pillar
-  scores (rounded to one decimal). Provide one concrete suggestion for how the student
-  could improve the prompt.
+  For each pillar, give the score and a one-sentence reason explaining that score.
+  Then compute overall as the average of the four pillar scores (rounded to one decimal).
+  Also provide one concrete top-level suggestion for how the student could improve the prompt.
 
   Set "total" to round(average_of_pillars * 20) so it is an integer from 0–100.
   Put the single top improvement suggestion in "feedback".
@@ -114,13 +114,23 @@ four_pillars_judge_prompt: |
   {
     "total": <int 0-100>,
     "breakdown": {
-      "Clarity": {"score": <int 1-5>, "max": 5},
-      "Context": {"score": <int 1-5>, "max": 5},
-      "Precision": {"score": <int 1-5>, "max": 5},
-      "Persona": {"score": <int 1-5>, "max": 5}
+      "Clarity": {"score": <int 1-5>, "max": 5, "reason": "<one sentence>"},
+      "Context": {"score": <int 1-5>, "max": 5, "reason": "<one sentence>"},
+      "Precision": {"score": <int 1-5>, "max": 5, "reason": "<one sentence>"},
+      "Persona": {"score": <int 1-5>, "max": 5, "reason": "<one sentence>"}
     },
     "feedback": "<one specific, actionable improvement suggestion>"
   }
+
+# Student-facing guidance shown on every task when Four Pillars scoring is enabled.
+four_pillars_student_guidance: |
+  Your score includes how well your prompt follows the Four Pillars of Effective Prompting
+  (worth 50 of your 100 points on Document tasks). Aim to include all four elements:
+
+  • Clarity — Use simple, direct language. State the task or objective explicitly.
+  • Context — Give relevant background (who/what/when/where) and why the answer is needed.
+  • Precision — Specify exact requirements: format, structure, scope, and examples if helpful.
+  • Persona — Assign a clear role to the AI (e.g. “You are an experienced…”) when it helps.
 
 # ---------------------------------------------------------------------------
 # Tasks

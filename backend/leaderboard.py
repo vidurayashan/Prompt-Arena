@@ -15,22 +15,56 @@ def _conn() -> psycopg2.extensions.connection:
 
 
 def init_db() -> None:
-    """No-op: table is managed directly in Supabase."""
-    pass
+    """Ensure research score columns exist on scores (safe for existing Supabase tables)."""
+    con = _conn()
+    try:
+        with con:
+            with con.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE scores ADD COLUMN IF NOT EXISTS extraction_score int"
+                )
+                cur.execute(
+                    "ALTER TABLE scores ADD COLUMN IF NOT EXISTS pillars_score int"
+                )
+    finally:
+        con.close()
 
 
-def upsert_score(student_name: str, task_id: str, score: int, prompt: str = "") -> None:
-    """Insert a new score record. The leaderboard query picks the best per student."""
+def upsert_score(
+    student_name: str,
+    task_id: str,
+    score: int,
+    prompt: str = "",
+    *,
+    extraction_score: int | None = None,
+    pillars_score: int | None = None,
+) -> None:
+    """Insert a new score record. The leaderboard query picks the best per student.
+
+    score              – combined / leaderboard total (0–100)
+    extraction_score   – Document extraction accuracy alone (0–100), or None
+    pillars_score      – Four Pillars alone scaled to 0–100, or None
+    """
     con = _conn()
     try:
         with con:
             with con.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO scores (student_name, task_id, score, prompt)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO scores (
+                        student_name, task_id, score, prompt,
+                        extraction_score, pillars_score
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     """,
-                    (student_name, task_id, score, prompt),
+                    (
+                        student_name,
+                        task_id,
+                        score,
+                        prompt,
+                        extraction_score,
+                        pillars_score,
+                    ),
                 )
     finally:
         con.close()
@@ -103,7 +137,7 @@ def get_student_history(
         with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT score, prompt, submitted_at
+                SELECT score, extraction_score, pillars_score, prompt, submitted_at
                 FROM   scores
                 WHERE  {where_sql}
                 ORDER  BY submitted_at DESC
@@ -171,7 +205,8 @@ def get_student_prompts(
         with con.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT student_name, task_id, prompt, score, submitted_at
+                SELECT student_name, task_id, prompt, score,
+                       extraction_score, pillars_score, submitted_at
                 FROM   scores
                 WHERE  {where_sql}
                 ORDER  BY submitted_at DESC

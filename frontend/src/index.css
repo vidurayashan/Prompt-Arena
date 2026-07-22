@@ -515,6 +515,23 @@ main.lt-main {
 
 .act-tasks { margin-bottom: 16px; }
 
+.act-pillars-tip {
+  margin: -8px 0 16px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--blue-b);
+  background: var(--blue-l);
+  font-size: 12.5px;
+  color: var(--blue);
+  line-height: 1.45;
+}
+.act-pillars-tip strong { color: var(--blue); }
+
+.four-pillars-guidance {
+  border: 1px solid var(--blue-b) !important;
+  background: var(--blue-l) !important;
+}
+
 .act-task {
   display: flex;
   align-items: flex-start;
@@ -700,6 +717,40 @@ label {
 .score-item-row.full    { border-left-color: var(--success); background: var(--success-bg); }
 .score-item-row.partial { border-left-color: var(--amber);   background: var(--amber-l); }
 .score-item-row.zero    { border-left-color: var(--danger);  background: var(--danger-bg); }
+
+/* Four Pillars rows — cool blue/teal tint to differentiate from extraction */
+.score-pillars-block {
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  padding: .75rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--blue-b);
+  background: var(--blue-l);
+}
+.score-subsection-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  font-weight: 700;
+  font-size: .9rem;
+  color: var(--blue);
+}
+.score-subsection-pts { font-size: .9rem; }
+.score-subsection-extraction {
+  color: var(--text);
+  margin-top: .35rem;
+  padding-top: .35rem;
+}
+.score-item-row.pillar {
+  background: #fff;
+  border: 1px solid var(--blue-b);
+  border-left-width: 4px;
+}
+.score-item-row.pillar-full    { border-left-color: var(--teal); }
+.score-item-row.pillar-partial { border-left-color: var(--blue); }
+.score-item-row.pillar-zero    { border-left-color: #6b8cae; }
 
 .score-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: .2rem; }
 .score-item-label { font-weight: 600; font-size: .9rem; }

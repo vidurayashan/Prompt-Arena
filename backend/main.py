@@ -125,6 +125,7 @@ class ScoreItem(BaseModel):
 class JudgeBreakdownItem(BaseModel):
     score: int
     max: int
+    reason: str | None = None
 
 
 class SubmitResponse(BaseModel):
@@ -139,6 +140,9 @@ class SubmitResponse(BaseModel):
     four_pillars: dict[str, JudgeBreakdownItem] | None = None
     four_pillars_feedback: str | None = None
     four_pillars_overall: float | None = None
+    # Research / analytics: component scores each on a 0–100 scale (None if N/A)
+    extraction_score: int | None = None
+    pillars_score: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -358,9 +362,10 @@ def _run_four_pillars_eval(
     judge_base_url: str | None,
 ) -> tuple[dict[str, JudgeBreakdownItem] | None, str | None, float | None]:
     """
-    Formative Four Pillars feedback on the student prompt.
+    Four Pillars feedback on the student prompt.
     Returns (breakdown, feedback, overall/5) or (None, None, None) if disabled/unavailable.
-    Does not affect leaderboard totals.
+    For Document tasks, overall is blended 50:50 with extraction accuracy into the leaderboard total.
+    For Prompt/Chat tasks it remains formative-only (does not change totals).
     """
     if not _four_pillars_enabled():
         return None, None, None
@@ -380,7 +385,7 @@ def _run_four_pillars_eval(
             temperature=cfg.get("judge_temperature"),
         )
     except Exception:
-        # Formative only — never fail the main submission path
+        # Never fail the main submission path if pillars eval fails
         return None, None, None
 
     raw_breakdown = result.get("breakdown")
@@ -395,7 +400,9 @@ def _run_four_pillars_eval(
         score = val.get("score")
         max_score = val.get("max")
         if isinstance(score, int) and isinstance(max_score, int) and max_score > 0:
-            pillars[str(key)] = JudgeBreakdownItem(score=score, max=max_score)
+            reason = val.get("reason")
+            reason_str = reason.strip() if isinstance(reason, str) and reason.strip() else None
+            pillars[str(key)] = JudgeBreakdownItem(score=score, max=max_score, reason=reason_str)
             scores.append(score / max_score * 5)
 
     if not pillars:
@@ -474,7 +481,14 @@ def _rejected_submit_response(
     """Score 0 + warning when pre-prompt integrity check fails; still persist the attempt."""
     message = _pre_prompt_rejected_message(cfg)
     previous_best = leaderboard.get_student_best(student_name, task_id, since=since)
-    leaderboard.upsert_score(student_name, task_id, 0, stored_prompt)
+    leaderboard.upsert_score(
+        student_name,
+        task_id,
+        0,
+        stored_prompt,
+        extraction_score=0,
+        pillars_score=None,
+    )
     score_items: list[ScoreItem] = []
     if task.get("task_type", "Document") == "Document" and isinstance(task.get("items"), list):
         score_items = [
@@ -497,6 +511,8 @@ def _rejected_submit_response(
         is_new_best=False,
         judge_feedback=message,
         prompt_rejected=True,
+        extraction_score=0,
+        pillars_score=None,
     )
 
 
@@ -642,6 +658,12 @@ def _public_task(task: dict[str, Any], cfg: dict[str, Any]) -> dict[str, Any]:
     elif task_type == "Chat":
         if "judge_prompt" in task:
             base["judge_prompt"] = task["judge_prompt"]
+
+    # Shared Four Pillars student guidance (when enabled)
+    if _four_pillars_enabled():
+        guidance = cfg.get("four_pillars_student_guidance")
+        if isinstance(guidance, str) and guidance.strip():
+            base["four_pillars_guidance"] = guidance.strip()
 
     return base
 
@@ -878,18 +900,26 @@ def list_tasks() -> list[dict[str, Any]]:
     cfg = config_loader.get_config()
     published = leaderboard.get_published_task_ids()
     all_overrides = leaderboard.get_all_task_overrides()
+    guidance: str | None = None
+    if _four_pillars_enabled():
+        raw = cfg.get("four_pillars_student_guidance")
+        if isinstance(raw, str) and raw.strip():
+            guidance = raw.strip()
     result: list[dict[str, Any]] = []
     for t in cfg.get("tasks", []):
         if t["id"] not in published:
             continue
         overrides = all_overrides.get(t["id"], {})
         merged = _apply_overrides(t, overrides) if overrides else t
-        result.append({
+        entry: dict[str, Any] = {
             "id": merged["id"],
             "name": merged["name"],
             "description": merged["description"],
             "instructions": merged.get("instructions"),
-        })
+        }
+        if guidance:
+            entry["four_pillars_guidance"] = guidance
+        result.append(entry)
     return result
 
 
@@ -973,6 +1003,11 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         judge_key=judge_key,
         judge_base_url=judge_base_url,
     )
+    # Component scores on a 0–100 scale (kept separately for research)
+    pillars_score: int | None = (
+        round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+    )
+    extraction_score: int | None = None
 
     if task_type == "Document":
         # 1. Extract PDF text
@@ -1014,16 +1049,22 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
 
-        # Compute total server-side from individual scores — never trust the judge's arithmetic
+        # Compute extraction total server-side from individual scores — never trust the judge's arithmetic
         raw_scores = judgment.get("scores", [])
         if raw_scores:
-            total_score: int = round(
+            extraction_score = round(
                 sum(max(0, min(10, int(s.get("score", 0)))) for s in raw_scores)
                 / (10 * len(raw_scores))
                 * 100
             )
         else:
-            total_score = 0
+            extraction_score = 0
+
+        # Document tasks: 50% extraction accuracy + 50% Four Pillars (when available)
+        if pillars_score is not None:
+            total_score: int = round(0.5 * extraction_score + 0.5 * pillars_score)
+        else:
+            total_score = extraction_score
 
         scores_payload = raw_scores
 
@@ -1075,9 +1116,16 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
 
-    # Persist score
+    # Persist score (leaderboard total + separate research components)
     previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
-    leaderboard.upsert_score(body.student_name, task_id, total_score, body.prompt)
+    leaderboard.upsert_score(
+        body.student_name,
+        task_id,
+        total_score,
+        body.prompt,
+        extraction_score=extraction_score,
+        pillars_score=pillars_score,
+    )
     is_new_best = previous_best is None or total_score > previous_best
 
     # 5. Build per-item response (merge labels and answers back in, Document tasks only)
@@ -1111,6 +1159,8 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         four_pillars=four_pillars,
         four_pillars_feedback=four_pillars_feedback,
         four_pillars_overall=four_pillars_overall,
+        extraction_score=extraction_score,
+        pillars_score=pillars_score,
     )
 
 
@@ -1170,6 +1220,8 @@ def get_student_prompts(
             "task_name": task_name,
             "prompt": row["prompt"],
             "score": row["score"],
+            "extraction_score": row.get("extraction_score"),
+            "pillars_score": row.get("pillars_score"),
             "submitted_at": row["submitted_at"].isoformat() if hasattr(row["submitted_at"], "isoformat") else str(row["submitted_at"]),
         })
     return result
@@ -1316,6 +1368,9 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         judge_key=judge_key,
         judge_base_url=judge_base_url,
     )
+    pillars_score: int | None = (
+        round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+    )
 
     try:
         judgment_simple = llm_client.run_prompt_judge(
@@ -1333,7 +1388,14 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
 
     # Persist using the transcript as the stored "prompt"
     previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
-    leaderboard.upsert_score(body.student_name, task_id, total_score, transcript)
+    leaderboard.upsert_score(
+        body.student_name,
+        task_id,
+        total_score,
+        transcript,
+        extraction_score=None,
+        pillars_score=pillars_score,
+    )
     is_new_best = previous_best is None or total_score > previous_best
 
     return SubmitResponse(
@@ -1347,6 +1409,8 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         four_pillars=four_pillars,
         four_pillars_feedback=four_pillars_feedback,
         four_pillars_overall=four_pillars_overall,
+        extraction_score=None,
+        pillars_score=pillars_score,
     )
 
 

@@ -5,6 +5,7 @@ export interface Task {
   name: string;
   description: string;
   instructions?: { verb: string; text: string }[];
+  four_pillars_guidance?: string | null;
 }
 
 export interface TaskItem {
@@ -97,12 +98,16 @@ export interface SubmitResponse {
   total: number;
   previous_best: number | null;
   is_new_best: boolean;
-  judge_breakdown?: Record<string, { score: number; max: number }> | null;
+  judge_breakdown?: Record<string, { score: number; max: number; reason?: string | null }> | null;
   judge_feedback?: string | null;
   prompt_rejected?: boolean;
-  four_pillars?: Record<string, { score: number; max: number }> | null;
+  four_pillars?: Record<string, { score: number; max: number; reason?: string | null }> | null;
   four_pillars_feedback?: string | null;
   four_pillars_overall?: number | null;
+  /** Document extraction accuracy alone (0–100). Null for Prompt/Chat. */
+  extraction_score?: number | null;
+  /** Four Pillars alone scaled to 0–100. Null if pillars disabled/unavailable. */
+  pillars_score?: number | null;
 }
 
 export interface LeaderboardEntry {
@@ -115,6 +120,8 @@ export interface LeaderboardEntry {
 
 export interface SubmissionAttempt {
   score: number;
+  extraction_score?: number | null;
+  pillars_score?: number | null;
   prompt: string;
   submitted_at: string;
 }
@@ -125,6 +132,8 @@ export interface StudentPromptEntry {
   task_name: string;
   prompt: string;
   score: number;
+  extraction_score?: number | null;
+  pillars_score?: number | null;
   submitted_at: string;
 }
 

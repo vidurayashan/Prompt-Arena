@@ -11,6 +11,18 @@ function rowClass(score: number): string {
   return "score-item-row zero";
 }
 
+function pillarRowClass(score: number, max: number): string {
+  const pct = max > 0 ? score / max : 0;
+  if (pct >= 0.9) return "score-item-row pillar pillar-full";
+  if (pct >= 0.5) return "score-item-row pillar pillar-partial";
+  return "score-item-row pillar pillar-zero";
+}
+
+/** Convert overall /5 average to contribution out of 50. */
+function pillarsOutOf50(overall: number): string {
+  return `${Math.round(overall * 10)}/50`;
+}
+
 function FourPillarsBlock({ result }: { result: SubmitResponse }) {
   if (!result.four_pillars || Object.keys(result.four_pillars).length === 0) {
     return null;
@@ -38,7 +50,7 @@ function FourPillarsBlock({ result }: { result: SubmitResponse }) {
         <div style={{ fontWeight: 700 }}>Score for prompting best practices (Four Pillars)</div>
         {result.four_pillars_overall != null && (
           <div style={{ fontWeight: 700, fontSize: ".95rem" }}>
-            {result.four_pillars_overall.toFixed(1)}/5
+            {pillarsOutOf50(result.four_pillars_overall)}
           </div>
         )}
       </div>
@@ -69,8 +81,41 @@ function FourPillarsBlock({ result }: { result: SubmitResponse }) {
   );
 }
 
+function PillarsInBreakdown({ result }: { result: SubmitResponse }) {
+  if (!result.four_pillars || Object.keys(result.four_pillars).length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="score-pillars-block">
+      <div className="score-subsection-header">
+        <span>Four Pillars (50%)</span>
+        {result.four_pillars_overall != null && (
+          <span className="score-subsection-pts">{pillarsOutOf50(result.four_pillars_overall)}</span>
+        )}
+      </div>
+      <div className="score-items">
+        {Object.entries(result.four_pillars).map(([name, v]) => (
+          <div key={name} className={pillarRowClass(v.score, v.max)}>
+            <div className="score-item-top">
+              <span className="score-item-label">{name}</span>
+              <span className="score-item-pts">
+                {v.score}/{v.max}
+              </span>
+            </div>
+            {v.reason && <div className="score-item-reason">{v.reason}</div>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ScoreDisplay({ result }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const hasPillars =
+    !!result.four_pillars && Object.keys(result.four_pillars).length > 0;
+  const isDocument = result.scores.length > 0;
 
   function pct(score: number, max: number): string {
     if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return "—";
@@ -94,12 +139,15 @@ export default function ScoreDisplay({ result }: Props) {
             </div>
           )}
           <div style={{ fontSize: ".85rem", color: "var(--text-muted)", marginTop: ".25rem" }}>
-            {result.scores.length} item{result.scores.length !== 1 ? "s" : ""} graded
+            {isDocument && hasPillars
+              ? "50% extraction · 50% Four Pillars"
+              : `${result.scores.length} item${result.scores.length !== 1 ? "s" : ""} graded`}
           </div>
         </div>
       </div>
 
-      <FourPillarsBlock result={result} />
+      {/* Prompt/Chat: keep standalone Four Pillars block */}
+      {!isDocument && <FourPillarsBlock result={result} />}
 
       {/* Per-item breakdown */}
       {result.scores.length === 0 ? (
@@ -155,6 +203,14 @@ export default function ScoreDisplay({ result }: Props) {
           </div>
           {!collapsed && (
             <div className="score-items mt-1">
+              <PillarsInBreakdown result={result} />
+
+              {hasPillars && (
+                <div className="score-subsection-header score-subsection-extraction">
+                  <span>Extraction accuracy (50%)</span>
+                </div>
+              )}
+
               {result.scores.map((s) => (
                 <div key={s.item_id} className={rowClass(s.score)}>
                   <div className="score-item-top">
