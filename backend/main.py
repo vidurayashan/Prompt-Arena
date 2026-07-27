@@ -1207,6 +1207,9 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
             pillars_score = (
                 round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
             )
+            # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+            if pillars_score is not None:
+                total_score = pillars_score
             # Avoid a duplicate pillar block in the UI — four_pillars is the canonical display.
             judge_breakdown = None
         else:
@@ -1219,6 +1222,9 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
             pillars_score = (
                 round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
             )
+            # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+            if pillars_score is not None:
+                total_score = pillars_score
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
@@ -1502,6 +1508,9 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         pillars_score = (
             round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
         )
+        # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+        if pillars_score is not None:
+            total_score = pillars_score
         judge_breakdown = None
     else:
         four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
@@ -1513,6 +1522,9 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         pillars_score = (
             round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
         )
+        # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+        if pillars_score is not None:
+            total_score = pillars_score
 
     # Persist using the transcript as the stored "prompt"
     previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
