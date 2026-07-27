@@ -1490,8 +1490,20 @@ tasks:
     name: "Chat: Snack Café Social Media Strategy"
     task_type: "Chat"
     description: >
-      I'm thinking about the Snack Café's social media strategy. Help me think through the decision.
-      Start by asking me what you need to know.
+      You are helping the university Snack Café plan its social media strategy.
+      Use a multi-turn chat with the AI to develop a practical plan — clarify goals,
+      audience, brand tone, platforms, content ideas, posting cadence, and constraints
+      (time, budget, approvals). Keep the conversation going until you have a usable strategy,
+      then score the whole chat.
+    instructions:
+      - verb: "Read"
+        text: "the scenario carefully."
+      - verb: "Chat"
+        text: "with the AI to develop a practical social media strategy for the Snack Café."
+      - verb: "Cover"
+        text: "goals, audience, platforms, content ideas, cadence, and real constraints."
+      - verb: "Score"
+        text: "this chat when ready — the chat then resets so your next attempt starts fresh."
     judge_persona: "generous"
     judge_prompt: |
       ### LLM Judge Prompt

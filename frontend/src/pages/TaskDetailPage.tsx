@@ -168,9 +168,27 @@ export default function TaskDetailPage() {
         )}
         {isChatTask && (
           <p style={{ color: "var(--text-muted)", marginBottom: "1.25rem", fontSize: ".85rem" }}>
-            This is a <strong>Chat</strong> task. Have a multi-turn conversation with the model, then use{" "}
-            <strong>Score this chat</strong> to get feedback on the whole conversation.
+            This is a <strong>Chat</strong> task. Build a substantive multi-turn conversation — the whole
+            transcript is scored together. One short message will not score well. When you press{" "}
+            <strong>Score this chat</strong>, you get feedback and the chat clears so your next attempt
+            starts with no history.
           </p>
+        )}
+
+        {task.instructions && task.instructions.length > 0 && (
+          <div className="card mb-2">
+            <h2 style={{ margin: 0, marginBottom: ".75rem" }}>What to do</h2>
+            <div className="act-tasks" style={{ marginBottom: 0 }}>
+              {task.instructions.map((step, i) => (
+                <div key={i} className="act-task">
+                  <span className="task-num">{i + 1}</span>
+                  <span>
+                    <span className="task-verb">{step.verb}</span> {step.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
         {task.four_pillars_guidance && (
@@ -413,6 +431,8 @@ export default function TaskDetailPage() {
                     const res = await api.chatScore(taskId, studentName, chatHistory);
                     setResult(res);
                     setStage("done");
+                    setChatHistory([]);
+                    setChatInput("");
                     if (res.is_new_best && taskId) {
                       try {
                         const stored = JSON.parse(localStorage.getItem("taskBests") || "{}") as Record<string, number>;
