@@ -5,6 +5,8 @@ interface Props {
   result: SubmitResponse;
 }
 
+const PILLAR_KEYS = new Set(["clarity", "context", "precision", "persona"]);
+
 function rowClass(score: number): string {
   if (score >= 9) return "score-item-row full";
   if (score >= 5) return "score-item-row partial";
@@ -18,12 +20,29 @@ function pillarRowClass(score: number, max: number): string {
   return "score-item-row pillar pillar-zero";
 }
 
-/** Convert overall /5 average to contribution out of 50. */
+/** Convert overall /5 average to contribution out of 50 (Document blend). */
 function pillarsOutOf50(overall: number): string {
   return `${Math.round(overall * 10)}/50`;
 }
 
-function FourPillarsBlock({ result }: { result: SubmitResponse }) {
+function breakdownIsFourPillars(
+  breakdown: Record<string, { score: number; max: number }> | null | undefined
+): boolean {
+  if (!breakdown) return false;
+  const keys = new Set(Object.keys(breakdown).map((k) => k.trim().toLowerCase()));
+  for (const k of PILLAR_KEYS) {
+    if (!keys.has(k)) return false;
+  }
+  return true;
+}
+
+function FourPillarsBlock({
+  result,
+  showOutOf50,
+}: {
+  result: SubmitResponse;
+  showOutOf50: boolean;
+}) {
   if (!result.four_pillars || Object.keys(result.four_pillars).length === 0) {
     return null;
   }
@@ -47,8 +66,12 @@ function FourPillarsBlock({ result }: { result: SubmitResponse }) {
           marginBottom: ".35rem",
         }}
       >
-        <div style={{ fontWeight: 700 }}>Score for prompting best practices (Four Pillars)</div>
-        {result.four_pillars_overall != null && (
+        <div style={{ fontWeight: 700 }}>
+          {showOutOf50
+            ? "Score for prompting best practices (Four Pillars)"
+            : "Four Pillars"}
+        </div>
+        {showOutOf50 && result.four_pillars_overall != null && (
           <div style={{ fontWeight: 700, fontSize: ".95rem" }}>
             {pillarsOutOf50(result.four_pillars_overall)}
           </div>
@@ -116,10 +139,20 @@ export default function ScoreDisplay({ result }: Props) {
   const hasPillars =
     !!result.four_pillars && Object.keys(result.four_pillars).length > 0;
   const isDocument = result.scores.length > 0;
+  const judgeBreakdown = result.judge_breakdown;
+  const hasJudgeBreakdown =
+    !!judgeBreakdown && Object.keys(judgeBreakdown).length > 0;
+  // Prefer four_pillars when the task judge already returned pillar scores (avoid duplicate blocks).
+  const showJudgeBreakdown =
+    hasJudgeBreakdown && !(hasPillars && breakdownIsFourPillars(judgeBreakdown));
 
-  function pct(score: number, max: number): string {
-    if (!Number.isFinite(score) || !Number.isFinite(max) || max <= 0) return "—";
-    return `${Math.round((score / max) * 100)}%`;
+  function headerSubtitle(): string {
+    if (isDocument && hasPillars) return "50% extraction · 50% Four Pillars";
+    if (isDocument) {
+      return `${result.scores.length} item${result.scores.length !== 1 ? "s" : ""} graded`;
+    }
+    if (hasPillars) return "Four Pillars";
+    return "Scored by AI judge";
   }
 
   return (
@@ -139,20 +172,18 @@ export default function ScoreDisplay({ result }: Props) {
             </div>
           )}
           <div style={{ fontSize: ".85rem", color: "var(--text-muted)", marginTop: ".25rem" }}>
-            {isDocument && hasPillars
-              ? "50% extraction · 50% Four Pillars"
-              : `${result.scores.length} item${result.scores.length !== 1 ? "s" : ""} graded`}
+            {headerSubtitle()}
           </div>
         </div>
       </div>
 
-      {/* Prompt/Chat: keep standalone Four Pillars block */}
-      {!isDocument && <FourPillarsBlock result={result} />}
+      {/* Prompt/Chat: single Four Pillars block (no /50 — total already reflects the grade) */}
+      {!isDocument && <FourPillarsBlock result={result} showOutOf50={false} />}
 
       {/* Per-item breakdown */}
       {result.scores.length === 0 ? (
         <div style={{ marginTop: "1rem" }}>
-          {result.judge_breakdown && Object.keys(result.judge_breakdown).length > 0 ? (
+          {showJudgeBreakdown ? (
             <div
               style={{
                 border: "1px solid var(--border)",
@@ -162,11 +193,20 @@ export default function ScoreDisplay({ result }: Props) {
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: ".35rem" }}>Judge breakdown</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr max-content", gap: ".35rem .75rem", fontSize: ".9rem" }}>
-                {Object.entries(result.judge_breakdown).map(([k, v]) => (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr max-content",
+                  gap: ".35rem .75rem",
+                  fontSize: ".9rem",
+                }}
+              >
+                {Object.entries(judgeBreakdown!).map(([k, v]) => (
                   <div key={k} style={{ display: "contents" }}>
                     <div style={{ color: "var(--text-muted)", fontWeight: 600 }}>{k}</div>
-                    <div style={{ fontWeight: 700 }}>{pct(v.score, v.max)}</div>
+                    <div style={{ fontWeight: 700 }}>
+                      {v.score}/{v.max}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -177,11 +217,20 @@ export default function ScoreDisplay({ result }: Props) {
                 </div>
               )}
             </div>
-          ) : (
+          ) : !hasPillars ? (
             <div style={{ fontSize: ".85rem", color: "var(--text-muted)" }}>
-              Scored by AI judge (no per-item breakdown for this task).
+              {result.judge_feedback ? (
+                <>
+                  <div style={{ fontWeight: 700, marginBottom: ".2rem", color: "var(--text)" }}>
+                    Feedback
+                  </div>
+                  <div>{result.judge_feedback}</div>
+                </>
+              ) : (
+                "Scored by AI judge (no per-item breakdown for this task)."
+              )}
             </div>
-          )}
+          ) : null}
         </div>
       ) : (
         <>

@@ -145,6 +145,10 @@ four_pillars_student_guidance: |
 #     id          - integer (used in scoring)
 #     label       - what students see (the thing they need to extract)
 #     answer      - correct answer (NEVER shown to students)
+#   strict_judge_prompt   - optional: Document scoring rubric for persona "strict"
+#                           (defaults to built-in code rubric; overridable live in admin)
+#   generous_judge_prompt - optional: Document scoring rubric for persona "generous"
+#                           (defaults to built-in code rubric; overridable live in admin)
 #
 # For task_type = "Prompt":
 #   judge_prompt  - LLM prompt used to grade either the student's prompt or the LLM output

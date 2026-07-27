@@ -236,6 +236,8 @@ _OVERRIDE_KEYS = frozenset({
     "prompt_panel_body",
     "prompt_placeholder",
     "judge_prompt",
+    "strict_judge_prompt",
+    "generous_judge_prompt",
     "pre_prompt_judge_prompt",
     "judge_persona",
     "evaluate_what",
@@ -331,6 +333,23 @@ def _effective_pre_prompt_judge_prompt(task: dict[str, Any], cfg: dict[str, Any]
     return str(raw).strip()
 
 
+def _effective_document_judge_prompts(task: dict[str, Any]) -> tuple[str, str]:
+    """Strict and generous Document scoring rubrics (task override/YAML or code defaults)."""
+    strict_raw = task.get("strict_judge_prompt")
+    generous_raw = task.get("generous_judge_prompt")
+    strict = (
+        str(strict_raw).strip()
+        if isinstance(strict_raw, str) and strict_raw.strip()
+        else llm_client.DEFAULT_STRICT_JUDGE_PROMPT
+    )
+    generous = (
+        str(generous_raw).strip()
+        if isinstance(generous_raw, str) and generous_raw.strip()
+        else llm_client.DEFAULT_GENEROUS_JUDGE_PROMPT
+    )
+    return strict, generous
+
+
 def _pre_prompt_rejected_message(cfg: dict[str, Any]) -> str:
     raw = cfg.get("pre_prompt_rejected_message")
     if isinstance(raw, str) and raw.strip():
@@ -410,6 +429,43 @@ def _run_four_pillars_eval(
 
     overall = round(sum(scores) / len(scores), 1) if scores else None
     feedback = result.get("feedback")
+    feedback_str = feedback if isinstance(feedback, str) and feedback.strip() else None
+    return pillars, feedback_str, overall
+
+
+_PILLAR_KEYS = frozenset({"clarity", "context", "precision", "persona"})
+
+
+def _breakdown_is_four_pillars(breakdown: Any) -> bool:
+    """True when a judge breakdown includes all Four Pillars keys (case-insensitive)."""
+    if not isinstance(breakdown, dict) or not breakdown:
+        return False
+    keys = {str(k).strip().lower() for k in breakdown}
+    return _PILLAR_KEYS.issubset(keys)
+
+
+def _pillars_from_breakdown(
+    breakdown: dict[str, Any],
+    feedback: Any = None,
+) -> tuple[dict[str, JudgeBreakdownItem] | None, str | None, float | None]:
+    """Parse a judge breakdown into four_pillars fields (overall on a /5 scale)."""
+    pillars: dict[str, JudgeBreakdownItem] = {}
+    scores: list[float] = []
+    for key, val in breakdown.items():
+        if not isinstance(val, dict):
+            continue
+        score = val.get("score")
+        max_score = val.get("max")
+        if isinstance(score, int) and isinstance(max_score, int) and max_score > 0:
+            reason = val.get("reason")
+            reason_str = reason.strip() if isinstance(reason, str) and reason.strip() else None
+            pillars[str(key)] = JudgeBreakdownItem(score=score, max=max_score, reason=reason_str)
+            scores.append(score / max_score * 5)
+
+    if not pillars:
+        return None, None, None
+
+    overall = round(sum(scores) / len(scores), 1) if scores else None
     feedback_str = feedback if isinstance(feedback, str) and feedback.strip() else None
     return pillars, feedback_str, overall
 
@@ -736,6 +792,8 @@ def admin_list_tasks(_: None = Depends(require_admin)) -> list[dict[str, Any]]:
             "prompt_panel_body",
             "prompt_placeholder",
             "judge_prompt",
+            "strict_judge_prompt",
+            "generous_judge_prompt",
             "pre_prompt_judge_prompt",
             "judge_persona",
             "evaluate_what",
@@ -744,6 +802,11 @@ def admin_list_tasks(_: None = Depends(require_admin)) -> list[dict[str, Any]]:
                 entry[key] = merged[key]
         # Always expose effective pre-prompt judge (task override or global default)
         entry["pre_prompt_judge_prompt"] = _effective_pre_prompt_judge_prompt(merged, cfg)
+        # Document tasks: always expose effective strict/generous scoring rubrics
+        if str(merged.get("task_type", "Document")).strip() == "Document":
+            strict_prompt, generous_prompt = _effective_document_judge_prompts(merged)
+            entry["strict_judge_prompt"] = strict_prompt
+            entry["generous_judge_prompt"] = generous_prompt
         result.append(entry)
     return result
 
@@ -770,6 +833,10 @@ def admin_set_task_overrides(
     saved = leaderboard.set_task_overrides(task_id, cleaned)
     cfg = config_loader.get_config()
     merged = _merged_task(task_id)
+    task_type = str(merged.get("task_type", "Document")).strip()
+    strict_prompt = generous_prompt = None
+    if task_type == "Document":
+        strict_prompt, generous_prompt = _effective_document_judge_prompts(merged)
     return {
         "id": task_id,
         "overrides": saved,
@@ -783,6 +850,8 @@ def admin_set_task_overrides(
         "prompt_panel_body": merged.get("prompt_panel_body"),
         "prompt_placeholder": merged.get("prompt_placeholder"),
         "judge_prompt": merged.get("judge_prompt"),
+        "strict_judge_prompt": strict_prompt,
+        "generous_judge_prompt": generous_prompt,
         "pre_prompt_judge_prompt": _effective_pre_prompt_judge_prompt(merged, cfg),
         "judge_persona": merged.get("judge_persona"),
         "evaluate_what": merged.get("evaluate_what"),
@@ -798,6 +867,10 @@ def admin_clear_task_overrides(
     leaderboard.clear_task_overrides(task_id)
     cfg = config_loader.get_config()
     merged = _merged_task(task_id)
+    task_type = str(merged.get("task_type", "Document")).strip()
+    strict_prompt = generous_prompt = None
+    if task_type == "Document":
+        strict_prompt, generous_prompt = _effective_document_judge_prompts(merged)
     return {
         "id": task_id,
         "overrides": {},
@@ -811,6 +884,8 @@ def admin_clear_task_overrides(
         "prompt_panel_body": merged.get("prompt_panel_body"),
         "prompt_placeholder": merged.get("prompt_placeholder"),
         "judge_prompt": merged.get("judge_prompt"),
+        "strict_judge_prompt": strict_prompt,
+        "generous_judge_prompt": generous_prompt,
         "pre_prompt_judge_prompt": _effective_pre_prompt_judge_prompt(merged, cfg),
         "judge_persona": merged.get("judge_persona"),
         "evaluate_what": merged.get("evaluate_what"),
@@ -997,19 +1072,24 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
             since=since,
         )
 
-    four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
-        cfg=cfg,
-        student_prompt=body.prompt,
-        judge_key=judge_key,
-        judge_base_url=judge_base_url,
-    )
+    four_pillars: dict[str, JudgeBreakdownItem] | None = None
+    four_pillars_feedback: str | None = None
+    four_pillars_overall: float | None = None
     # Component scores on a 0–100 scale (kept separately for research)
-    pillars_score: int | None = (
-        round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
-    )
+    pillars_score: int | None = None
     extraction_score: int | None = None
 
     if task_type == "Document":
+        four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+            cfg=cfg,
+            student_prompt=body.prompt,
+            judge_key=judge_key,
+            judge_base_url=judge_base_url,
+        )
+        pillars_score = (
+            round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+        )
+
         # 1. Extract PDF text
         doc_path = config_loader.get_document_path(task)
         try:
@@ -1035,6 +1115,10 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         global_persona = cfg.get("judge_persona", "strict")
         task_persona = task.get("judge_persona", global_persona)
         judge_temperature = cfg.get("judge_temperature")
+        strict_prompt, generous_prompt = _effective_document_judge_prompts(task)
+        selected_prompt = (
+            generous_prompt if task_persona == "generous" else strict_prompt
+        )
         try:
             judgment = llm_client.run_judge(
                 api_key=judge_key,
@@ -1045,6 +1129,7 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
                 base_url=judge_base_url,
                 persona=task_persona,
                 temperature=judge_temperature,
+                system_prompt=selected_prompt,
             )
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
@@ -1112,6 +1197,28 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         judge_breakdown = judgment_simple.get("breakdown")
         judge_feedback = judgment_simple.get("feedback")
         scores_payload = []
+
+        # If the task judge already scored Four Pillars, reuse it (skip a second LLM call).
+        if _breakdown_is_four_pillars(judge_breakdown):
+            four_pillars, four_pillars_feedback, four_pillars_overall = _pillars_from_breakdown(
+                judge_breakdown,
+                judgment_simple.get("feedback"),
+            )
+            pillars_score = (
+                round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+            )
+            # Avoid a duplicate pillar block in the UI — four_pillars is the canonical display.
+            judge_breakdown = None
+        else:
+            four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+                cfg=cfg,
+                student_prompt=body.prompt,
+                judge_key=judge_key,
+                judge_base_url=judge_base_url,
+            )
+            pillars_score = (
+                round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+            )
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
@@ -1362,16 +1469,6 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
             since=since,
         )
 
-    four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
-        cfg=cfg,
-        student_prompt=student_prompt_text,
-        judge_key=judge_key,
-        judge_base_url=judge_base_url,
-    )
-    pillars_score: int | None = (
-        round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
-    )
-
     try:
         judgment_simple = llm_client.run_prompt_judge(
             api_key=judge_key,
@@ -1385,6 +1482,37 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
 
     total_score = int(judgment_simple.get("total", 0))
     total_score = max(0, min(100, total_score))
+
+    raw_breakdown = judgment_simple.get("breakdown")
+    judge_feedback = (
+        judgment_simple.get("feedback")
+        if isinstance(judgment_simple.get("feedback"), str)
+        else None
+    )
+    judge_breakdown: dict[str, Any] | None = (
+        raw_breakdown if isinstance(raw_breakdown, dict) else None
+    )
+
+    # If the task judge already scored Four Pillars, reuse it (skip a second LLM call).
+    if _breakdown_is_four_pillars(judge_breakdown):
+        four_pillars, four_pillars_feedback, four_pillars_overall = _pillars_from_breakdown(
+            judge_breakdown,
+            judgment_simple.get("feedback"),
+        )
+        pillars_score = (
+            round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+        )
+        judge_breakdown = None
+    else:
+        four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+            cfg=cfg,
+            student_prompt=student_prompt_text,
+            judge_key=judge_key,
+            judge_base_url=judge_base_url,
+        )
+        pillars_score = (
+            round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+        )
 
     # Persist using the transcript as the stored "prompt"
     previous_best = leaderboard.get_student_best(body.student_name, task_id, since=since)
@@ -1404,7 +1532,8 @@ def chat_score(task_id: str, body: ChatScoreRequest) -> SubmitResponse:
         total=total_score,
         previous_best=previous_best,
         is_new_best=is_new_best,
-        judge_feedback=judgment_simple.get("feedback") if isinstance(judgment_simple.get("feedback"), str) else None,
+        judge_breakdown=judge_breakdown,
+        judge_feedback=judge_feedback,
         prompt_rejected=False,
         four_pillars=four_pillars,
         four_pillars_feedback=four_pillars_feedback,

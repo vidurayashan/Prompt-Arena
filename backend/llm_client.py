@@ -93,7 +93,7 @@ def run_chat_turn(
 # Judge LLM: score the student's output against correct answers
 # ---------------------------------------------------------------------------
 
-_JUDGE_SYSTEM_GENEROUS = """\
+DEFAULT_GENEROUS_JUDGE_PROMPT = """\
 You are a generous but accurate grading assistant. You will be given:
 1. A list of information items that a student was asked to extract from a document.
 2. The correct answer for each item.
@@ -166,7 +166,10 @@ provided for that item. If not mentioned at all, use "not found".
 The "total" field must equal: round(sum(scores) / (10 * number_of_items) * 100).
 """
 
-_JUDGE_SYSTEM = """\
+# Backwards-compatible aliases
+_JUDGE_SYSTEM_GENEROUS = DEFAULT_GENEROUS_JUDGE_PROMPT
+
+DEFAULT_STRICT_JUDGE_PROMPT = """\
 You are an impartial grading assistant. You will be given:
 1. A list of information items that a student was asked to extract from a document.
 2. The correct answer for each item.
@@ -252,6 +255,9 @@ provided for that item. If not mentioned at all, use "not found".
 The "total" field must equal: round(sum(scores) / (10 * number_of_items) * 100).
 """
 
+# Backwards-compatible aliases
+_JUDGE_SYSTEM = DEFAULT_STRICT_JUDGE_PROMPT
+
 
 def run_judge(
     api_key: str,
@@ -262,15 +268,26 @@ def run_judge(
     base_url: str | None = None,
     persona: str = "strict",
     temperature: float | None = None,
+    system_prompt: str | None = None,
 ) -> dict[str, Any]:
     """Return a scoring dict with per-item scores and a total 0-100.
 
     persona: "strict" (default) uses the detailed partial-credit rubric;
              "generous" awards full marks for correct core info regardless of phrasing.
+    system_prompt: if provided, used as the judge system message; otherwise
+                   persona selects DEFAULT_STRICT_JUDGE_PROMPT or
+                   DEFAULT_GENEROUS_JUDGE_PROMPT.
     """
     client = _client(api_key, base_url)
 
-    system_prompt = _JUDGE_SYSTEM_GENEROUS if persona == "generous" else _JUDGE_SYSTEM
+    if system_prompt and system_prompt.strip():
+        resolved_prompt = system_prompt
+    else:
+        resolved_prompt = (
+            DEFAULT_GENEROUS_JUDGE_PROMPT
+            if persona == "generous"
+            else DEFAULT_STRICT_JUDGE_PROMPT
+        )
 
     items_text = "\n".join(
         f"  Item {item['id']}: {item['label']}  |  Correct answer: {answer}"
@@ -285,7 +302,7 @@ def run_judge(
     kwargs: dict[str, Any] = {
         "model": judge_model,
         "messages": [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": resolved_prompt},
             {"role": "user", "content": user_msg},
         ],
     }

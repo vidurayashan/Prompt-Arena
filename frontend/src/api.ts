@@ -41,6 +41,8 @@ export interface AdminTask {
   prompt_panel_body?: string;
   prompt_placeholder?: string;
   judge_prompt?: string;
+  strict_judge_prompt?: string;
+  generous_judge_prompt?: string;
   pre_prompt_judge_prompt?: string;
   judge_persona?: string;
   evaluate_what?: "prompt" | "output" | string;
@@ -55,6 +57,8 @@ export interface TaskOverridesPayload {
   prompt_panel_body?: string;
   prompt_placeholder?: string;
   judge_prompt?: string;
+  strict_judge_prompt?: string;
+  generous_judge_prompt?: string;
   pre_prompt_judge_prompt?: string;
   judge_persona?: string;
   evaluate_what?: string;
@@ -73,6 +77,8 @@ export interface AdminTaskOverrideResponse {
   prompt_panel_body?: string | null;
   prompt_placeholder?: string | null;
   judge_prompt?: string | null;
+  strict_judge_prompt?: string | null;
+  generous_judge_prompt?: string | null;
   pre_prompt_judge_prompt?: string | null;
   judge_persona?: string | null;
   evaluate_what?: string | null;

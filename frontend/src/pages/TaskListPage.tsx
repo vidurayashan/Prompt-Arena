@@ -22,6 +22,8 @@ type EditFormState = {
   prompt_panel_body: string;
   prompt_placeholder: string;
   judge_prompt: string;
+  strict_judge_prompt: string;
+  generous_judge_prompt: string;
   pre_prompt_judge_prompt: string;
   judge_persona: string;
   evaluate_what: string;
@@ -37,6 +39,8 @@ function formFromTask(task: AdminTask): EditFormState {
     prompt_panel_body: task.prompt_panel_body ?? "",
     prompt_placeholder: task.prompt_placeholder ?? "",
     judge_prompt: task.judge_prompt ?? "",
+    strict_judge_prompt: task.strict_judge_prompt ?? "",
+    generous_judge_prompt: task.generous_judge_prompt ?? "",
     pre_prompt_judge_prompt: task.pre_prompt_judge_prompt ?? "",
     judge_persona: task.judge_persona ?? "strict",
     evaluate_what: task.evaluate_what ?? "prompt",
@@ -56,6 +60,15 @@ function buildOverridesPayload(form: EditFormState, taskType: string): TaskOverr
 
   if (form.pre_prompt_judge_prompt.trim()) {
     payload.pre_prompt_judge_prompt = form.pre_prompt_judge_prompt;
+  }
+
+  if (taskType === "Document") {
+    if (form.strict_judge_prompt.trim()) {
+      payload.strict_judge_prompt = form.strict_judge_prompt;
+    }
+    if (form.generous_judge_prompt.trim()) {
+      payload.generous_judge_prompt = form.generous_judge_prompt;
+    }
   }
 
   if (taskType === "Prompt" || taskType === "Chat") {
@@ -82,6 +95,8 @@ function applyOverrideResponse(task: AdminTask, res: {
   prompt_panel_body?: string | null;
   prompt_placeholder?: string | null;
   judge_prompt?: string | null;
+  strict_judge_prompt?: string | null;
+  generous_judge_prompt?: string | null;
   pre_prompt_judge_prompt?: string | null;
   judge_persona?: string | null;
   evaluate_what?: string | null;
@@ -98,6 +113,8 @@ function applyOverrideResponse(task: AdminTask, res: {
     prompt_panel_body: res.prompt_panel_body ?? undefined,
     prompt_placeholder: res.prompt_placeholder ?? undefined,
     judge_prompt: res.judge_prompt ?? undefined,
+    strict_judge_prompt: res.strict_judge_prompt ?? undefined,
+    generous_judge_prompt: res.generous_judge_prompt ?? undefined,
     pre_prompt_judge_prompt: res.pre_prompt_judge_prompt ?? undefined,
     judge_persona: res.judge_persona ?? undefined,
     evaluate_what: res.evaluate_what ?? undefined,
@@ -943,10 +960,39 @@ export default function TaskListPage() {
                           </select>
                           {task.task_type === "Document" && (
                             <div style={{ fontSize: 12, color: "var(--ink3)", marginTop: 4 }}>
-                              Document tasks use the built-in item scoring rubric (not a free-text scoring judge prompt).
+                              Selects which Document scoring rubric (strict or generous) runs at score time.
                             </div>
                           )}
                         </div>
+
+                        {task.task_type === "Document" && (
+                          <>
+                            <div className="lf">
+                              <label>Strict scoring judge prompt</label>
+                              <textarea
+                                className="input"
+                                rows={12}
+                                style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+                                value={editForm.strict_judge_prompt}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, strict_judge_prompt: e.target.value })
+                                }
+                              />
+                            </div>
+                            <div className="lf">
+                              <label>Generous scoring judge prompt</label>
+                              <textarea
+                                className="input"
+                                rows={12}
+                                style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+                                value={editForm.generous_judge_prompt}
+                                onChange={(e) =>
+                                  setEditForm({ ...editForm, generous_judge_prompt: e.target.value })
+                                }
+                              />
+                            </div>
+                          </>
+                        )}
 
                         <div className="lf">
                           <label>Pre-prompt judge</label>
