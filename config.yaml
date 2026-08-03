@@ -1740,15 +1740,54 @@ tasks:
       ---
       ### Scoring Rules
 
-      Award partial marks within each check if the AI got it partly right.
+      Evaluate the AI's output month by month. Award points based on:
+      
+      **Month 1 (15 points):**
+      - Correct base licence calculation (3 pts)
+      - Correct discount applied (25% off Admins only) (3 pts)
+      - Correct add-ons (API only, no Analytics) (2 pts)
+      - Correct surcharge check and application (3 pts)
+      - Correct GST calculation (2 pts)
+      - Correct one-time fee inclusion (2 pts)
+      
+      **Month 2 (15 points):**
+      - Correct base licence calculation (3 pts)
+      - Correct discount applied (10% off entire base) (3 pts)
+      - Correct add-ons (API + Analytics) (3 pts)
+      - Correct surcharge check and application (3 pts)
+      - Correct GST calculation (2 pts)
+      - Correct data migration fee inclusion (1 pt)
+      
+      **Month 3 (15 points):**
+      - Correct base licence calculation (2 pts)
+      - Correct tiered discount check (>$200 → 15% off) (3 pts)
+      - Correct add-ons (API + Analytics) (2 pts)
+      - Correct referral credit application (3 pts)
+      - Correct surcharge check and application (3 pts)
+      - Correct GST calculation (2 pts)
+      
+      **Final Total (5 points):**
+      - Correct grand total of $1,796.48 (5 pts)
+      
+      **Total: 50 points max**
+      
+      Award partial marks if calculations are close but have minor rounding differences.
+      Award 0 for a calculation step if fundamentally wrong (wrong rule, wrong order, etc).
+      
       ---
       ### Output Format
-      - **Score:** X/100
-      - **Final Answer Found in Output:** [exact dollar amount the AI stated, or "none"]
-      - **Feedback:** 2–3 sentences. If correct, confirm. If close, identify the likely
-        rounding or ordering error. If wrong, identify which month or rule the AI most
-        likely mishandled (e.g., applied surcharge after GST, missed Analytics in Month 2,
-        applied referral credit before discount, used wrong tier, etc.).
+      Respond with ONLY a JSON object (no markdown fences):
+      {
+        "total": <int 0-100 (this is correctness_score * 2 for compatibility)>,
+        "correctness_score": <int 0-50>,
+        "month_1_score": <int 0-15>,
+        "month_2_score": <int 0-15>,
+        "month_3_score": <int 0-15>,
+        "final_total_score": <int 0-5>,
+        "final_answer_found": "<exact dollar amount AI stated, or 'none'>",
+        "expected_answer": "$1,796.48",
+        "feedback": "<2-3 sentences. If correct, confirm. If wrong, list specific calculation errors by month (e.g., 'Month 1: Applied discount incorrectly. Month 2: Missed Analytics add-on. Month 3: Used 8% discount instead of 15%.')>"
+      }
 
     evaluate_what: "output"
 

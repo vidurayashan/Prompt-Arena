@@ -1190,41 +1190,98 @@ def submit_prompt(task_id: str, body: SubmitRequest) -> SubmitResponse:
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Judge LLM error: {exc}")
 
-        total_score = int(judgment_simple.get("total", 0))
-        total_score = max(0, min(100, total_score))
         # Frontend should see the model's answer in the Model output box.
         student_output = model_output
-        judge_breakdown = judgment_simple.get("breakdown")
-        judge_feedback = judgment_simple.get("feedback")
         scores_payload = []
 
-        # If the task judge already scored Four Pillars, reuse it (skip a second LLM call).
-        if _breakdown_is_four_pillars(judge_breakdown):
-            four_pillars, four_pillars_feedback, four_pillars_overall = _pillars_from_breakdown(
-                judge_breakdown,
-                judgment_simple.get("feedback"),
-            )
-            pillars_score = (
-                round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
-            )
-            # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
-            if pillars_score is not None:
-                total_score = pillars_score
-            # Avoid a duplicate pillar block in the UI — four_pillars is the canonical display.
-            judge_breakdown = None
-        else:
+        # Special handling for Chain of Thought task: 50% quality (Four Pillars) + 50% correctness
+        if task_id == "task_chain_of_thought_enterprise_billing":
+            # Extract correctness score from judge response (0-50)
+            correctness_score_raw = judgment_simple.get("correctness_score", 0)
+            if isinstance(correctness_score_raw, int):
+                correctness_score = max(0, min(50, correctness_score_raw))
+            else:
+                correctness_score = 0
+            
+            # Convert to 0-100 scale for display purposes
+            correctness_score_100 = correctness_score * 2
+            
+            # Always run Four Pillars for quality (0-100 scale)
             four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
                 cfg=cfg,
                 student_prompt=body.prompt,
                 judge_key=judge_key,
                 judge_base_url=judge_base_url,
             )
-            pillars_score = (
-                round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+            
+            quality_score = 0
+            if four_pillars_overall is not None:
+                quality_score = round(four_pillars_overall / 5 * 100)
+            
+            # 50:50 split: quality (0-50) + correctness (0-50)
+            total_score = round(quality_score * 0.5 + correctness_score)
+            
+            pillars_score = quality_score
+            
+            # Build comprehensive feedback with expected vs actual
+            final_answer_found = judgment_simple.get("final_answer_found", "none")
+            expected_answer = judgment_simple.get("expected_answer", "$1,796.48")
+            base_feedback = judgment_simple.get("feedback", "")
+            
+            judge_feedback = (
+                f"Expected Answer: {expected_answer} | "
+                f"Your AI's Answer: {final_answer_found}\n\n"
+                f"Quality Score (Four Pillars): {quality_score}/100\n"
+                f"Correctness Score (Step-by-step): {correctness_score_100}/100\n\n"
+                f"{base_feedback}"
             )
-            # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
-            if pillars_score is not None:
-                total_score = pillars_score
+            
+            # Build breakdown showing month scores
+            month_1_score = judgment_simple.get("month_1_score", 0)
+            month_2_score = judgment_simple.get("month_2_score", 0)
+            month_3_score = judgment_simple.get("month_3_score", 0)
+            final_total_score = judgment_simple.get("final_total_score", 0)
+            
+            judge_breakdown = {
+                "Month 1 Calculation": {"score": month_1_score, "max": 15},
+                "Month 2 Calculation": {"score": month_2_score, "max": 15},
+                "Month 3 Calculation": {"score": month_3_score, "max": 15},
+                "Final Total": {"score": final_total_score, "max": 5},
+            }
+        else:
+            # Standard Prompt task handling
+            total_score = int(judgment_simple.get("total", 0))
+            total_score = max(0, min(100, total_score))
+            judge_breakdown = judgment_simple.get("breakdown")
+            judge_feedback = judgment_simple.get("feedback")
+
+            # If the task judge already scored Four Pillars, reuse it (skip a second LLM call).
+            if _breakdown_is_four_pillars(judge_breakdown):
+                four_pillars, four_pillars_feedback, four_pillars_overall = _pillars_from_breakdown(
+                    judge_breakdown,
+                    judgment_simple.get("feedback"),
+                )
+                pillars_score = (
+                    round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+                )
+                # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+                if pillars_score is not None:
+                    total_score = pillars_score
+                # Avoid a duplicate pillar block in the UI — four_pillars is the canonical display.
+                judge_breakdown = None
+            else:
+                four_pillars, four_pillars_feedback, four_pillars_overall = _run_four_pillars_eval(
+                    cfg=cfg,
+                    student_prompt=body.prompt,
+                    judge_key=judge_key,
+                    judge_base_url=judge_base_url,
+                )
+                pillars_score = (
+                    round(four_pillars_overall / 5 * 100) if four_pillars_overall is not None else None
+                )
+                # Recalculate total from Four Pillars breakdown — never trust the judge's arithmetic
+                if pillars_score is not None:
+                    total_score = pillars_score
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported task_type for /submit: {task_type}")
